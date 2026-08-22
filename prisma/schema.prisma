@@ -1,0 +1,145 @@
+// prisma/schema.prisma
+// MediVault Database Schema — University of Zambia Clinic Patient Portal
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  RECEPTIONIST
+  DOCTOR
+  ADMIN
+  NEXT_OF_KIN
+}
+
+enum VisitStatus {
+  WAITING
+  CHECKED_IN
+  IN_CONSULTATION
+  CHECKED_OUT
+  CANCELLED
+}
+
+// ─── Models ────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  studentNumber String?  @unique
+  passwordHash  String
+  role          Role
+  fullName      String
+  phone         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  patientProfile  PatientProfile?
+  // Medical records this user created (as a doctor)
+  recordsCreated  MedicalRecord[] @relation("DoctorNotes")
+  // Medical records belonging to this user (as a patient)
+  patientRecords  MedicalRecord[] @relation("PatientRecords")
+  // Visits this user created (as receptionist or doctor)
+  visitsCreated   Visit[]         @relation("CreatedBy")
+  // Visits belonging to this user (as a patient)
+  patientVisits   Visit[]         @relation("PatientVisits")
+  // Access log entries created by this user
+  accessLogs      AccessLog[]     @relation("AccessedBy")
+  // Access logs where this user's record was accessed
+  accessLogsAbout AccessLog[]     @relation("TargetPatient")
+  // Assignments where this user is the patient
+  kinAssignments  NextOfKinAssignment[] @relation("Patient")
+  // Assignments where this user is the next of kin
+  kinFor          NextOfKinAssignment[] @relation("NextOfKin")
+}
+
+model PatientProfile {
+  userId                String    @id
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth           DateTime?
+  bloodType             String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  address               String?
+}
+
+model MedicalRecord {
+  id           String    @id @default(cuid())
+  patientId    String
+  // The patient this record belongs to
+  patient      User      @relation("PatientRecords", fields: [patientId], references: [id])
+  doctorId     String
+  // The doctor who created this record
+  doctor       User      @relation("DoctorNotes", fields: [doctorId], references: [id])
+  diagnosis    String
+  medications  String?   // Stored as JSON string: [{"name":"...","dose":"...","duration":"..."}]
+  allergies    String?
+  notes        String?
+  visitDate    DateTime  @default(now())
+  followUpDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Visit {
+  id          String      @id @default(cuid())
+  patientId   String
+  // The patient this visit belongs to
+  patient     User        @relation("PatientVisits", fields: [patientId], references: [id])
+  visitDate   DateTime    @default(now())
+  reason      String
+  vitals      String?     // e.g., "BP: 120/80, Temp: 98.6F, Weight: 70kg"
+  doctorNotes String?
+  status      VisitStatus @default(WAITING)
+  createdById String
+  // The staff member who created this visit record
+  createdBy   User        @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model NextOfKinAssignment {
+  id                   String    @id @default(cuid())
+  patientId            String
+  // The patient who assigned a next of kin
+  patient              User      @relation("Patient", fields: [patientId], references: [id])
+  kinUserId            String
+  // The person designated as next of kin
+  nextOfKin            User      @relation("NextOfKin", fields: [kinUserId], references: [id])
+  isActive             Boolean   @default(true)
+  delegatedAt          DateTime  @default(now())
+  // Whether the next of kin has granted emergency consent
+  emergencyConsentGiven Boolean  @default(false)
+  consentGivenAt       DateTime?
+  updatedAt            DateTime  @updatedAt
+}
+
+model AccessLog {
+  id               String   @id @default(cuid())
+  // Who performed the action
+  accessedByUserId String
+  accessedBy       User     @relation("AccessedBy", fields: [accessedByUserId], references: [id])
+  // Whose data was accessed (optional — some actions may not target a patient)
+  targetPatientId  String?
+  targetPatient    User?    @relation("TargetPatient", fields: [targetPatientId], references: [id])
+  // What was done: "VIEW", "CREATE", "EDIT", "DELETE"
+  action           String
+  // What type of resource: "MEDICAL_RECORD", "VISIT", "PROFILE", "NEXT_OF_KIN", "USER"
+  resourceType     String
+  // The ID of the specific resource (if applicable)
+  resourceId       String?
+  // Extra context stored as JSON string
+  details          String?
+  ipAddress        String?
+  userAgent        String?
+  timestamp        DateTime @default(now())
+}

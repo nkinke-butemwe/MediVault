@@ -1,0 +1,93 @@
+/* src/app/globals.css */
+/* Global styles and Tailwind CSS directives */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS variables for the MediVault design system */
+:root {
+  --color-primary: #0f3b5c;
+  --color-primary-dark: #0a2c45;
+  --color-primary-light: #e6f0f9;
+  --color-accent: #1f7b4d;
+  --color-accent-light: #e0f2e9;
+  --color-danger: #b91c1c;
+  --color-warning: #d97706;
+  --color-text: #1e2a3e;
+  --color-text-muted: #5a6e7c;
+  --color-border: #e2e8f0;
+  --color-surface: #ffffff;
+  --color-bg: #f4f7fc;
+}
+
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove default focus outline and add a custom one for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Subtle animation for page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Fade-in used specifically for modal cards.
+   IMPORTANT: this intentionally does NOT use "transform", unlike
+   .animate-fade-in above. A "transform" on a modal's own card would be
+   harmless on its own, but this class exists so modal content never
+   accidentally carries a transform-based animation that could confuse
+   position:fixed children (e.g. tooltips/dropdowns rendered inside a
+   modal). Keeping this opacity-only keeps modals simple and predictable. */
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in-modal {
+  animation: fadeInModal 0.15s ease-out forwards;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Status badge colours */
+.badge-waiting        { @apply bg-yellow-100 text-yellow-800; }
+.badge-checked-in     { @apply bg-blue-100 text-blue-800; }
+.badge-in-consultation{ @apply bg-purple-100 text-purple-800; }
+.badge-checked-out    { @apply bg-green-100 text-green-800; }
+.badge-cancelled      { @apply bg-red-100 text-red-800; }
+
+/* Role badge colours */
+.badge-patient        { @apply bg-teal-100 text-teal-800; }
+.badge-doctor         { @apply bg-blue-100 text-blue-800; }
+.badge-receptionist   { @apply bg-purple-100 text-purple-800; }
+.badge-admin          { @apply bg-orange-100 text-orange-800; }
+.badge-next_of_kin    { @apply bg-pink-100 text-pink-800; }

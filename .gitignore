@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Prisma generated client (regenerated from schema)
+# Keep: prisma/schema.prisma, prisma/seed.ts, prisma/migrations/
+# generated/prisma/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor config
+.vscode/
+.idea/
+
+# TypeScript cache
+*.tsbuildinfo
