@@ -23,7 +23,7 @@ MediVault is a secure, web-based patient portal that digitises student medical r
 - **RBAC Middleware**: Every route is protected; users can only access their own dashboards
 
 ---
-
+[![Open in VS Code](https://img.shields.io/badge/Open%20in-VS%20Code-007ACC?logo=visualstudiocode)](https://vscode.dev/github/nkinke-butemwe/MediVault)
 ## Prerequisites
 
 - **Node.js** v20 or higher — [nodejs.org](https://nodejs.org)
