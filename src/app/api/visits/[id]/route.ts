@@ -1,54 +1,33 @@
 // src/app/api/visits/[id]/route.ts
-// PUT /api/visits/:id — update visit status and notes
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { UpdateVisitSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const role = request.headers.get('x-user-role')
-  const actorId = request.headers.get('x-user-id')!
-
-  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+function getRoleAndActor(request: NextRequest) {
+  let role = request.headers.get('x-user-role')
+  let actorId = request.headers.get('x-user-id') ?? 'system'
+  if (!role) {
+    const token = request.cookies.get('medivault_token')?.value
+    if (token) { try { const p = JSON.parse(atob(token.split('.')[1])); role = p.role; actorId = p.userId ?? 'system' } catch {} }
   }
+  return { role, actorId }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  const { role, actorId } = getRoleAndActor(request)
+  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
   const validation = UpdateVisitSchema.safeParse(body)
-  if (!validation.success) {
-    return NextResponse.json(
-      { success: false, error: 'Validation failed', details: validation.error.flatten() },
-      { status: 400 }
-    )
-  }
+  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
 
   const visit = await prisma.visit.update({
     where: { id: params.id },
-    data: {
-      status: validation.data.status,
-      vitals: validation.data.vitals,
-      doctorNotes: validation.data.doctorNotes,
-      reason: validation.data.reason,
-    },
-    include: {
-      patient: { select: { id: true, fullName: true, email: true, studentNumber: true } },
-      createdBy: { select: { id: true, fullName: true } },
-    },
+    data: { status: validation.data.status, vitals: validation.data.vitals, doctorNotes: validation.data.doctorNotes, reason: validation.data.reason },
+    include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true } }, createdBy: { select: { id: true, fullName: true } } },
   })
 
-  await logAccess({
-    accessedByUserId: actorId,
-    targetPatientId: visit.patientId,
-    action: 'EDIT',
-    resourceType: 'VISIT',
-    resourceId: visit.id,
-    details: { newStatus: validation.data.status },
-    ...getRequestMeta(request),
-  })
-
+  await logAccess({ accessedByUserId: actorId, targetPatientId: visit.patientId, action: 'EDIT', resourceType: 'VISIT', resourceId: visit.id, details: { newStatus: validation.data.status }, ...getRequestMeta(request) })
   return NextResponse.json({ success: true, data: visit })
 }
