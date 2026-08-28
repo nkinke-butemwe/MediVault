@@ -8,6 +8,7 @@ import { prisma } from '@/src/lib/prisma'
 import { CreateUserSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 
+<<<<<<< HEAD
 // Helper: get role and actorId from headers or JWT cookie fallback
 function getRoleAndActor(request: NextRequest): { role: string | null; actorId: string } {
   let role = request.headers.get('x-user-role')
@@ -30,6 +31,10 @@ function getRoleAndActor(request: NextRequest): { role: string | null; actorId: 
 export async function GET(request: NextRequest) {
   const { role } = getRoleAndActor(request)
 
+=======
+export async function GET(request: NextRequest) {
+  const role = request.headers.get('x-user-role')
+>>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
   if (role !== 'ADMIN') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
   }
@@ -79,7 +84,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+<<<<<<< HEAD
   const { role, actorId } = getRoleAndActor(request)
+=======
+  const role = request.headers.get('x-user-role')
+  const actorId = request.headers.get('x-user-id')!
+>>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
 
   if (role !== 'ADMIN') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
@@ -146,4 +156,8 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({ success: true, data: user }, { status: 201 })
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
