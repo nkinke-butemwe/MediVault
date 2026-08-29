@@ -123,7 +123,7 @@ All accounts use the password: **`password123`**
 | `npm run db:migrate` | Run pending database migrations |
 | `npm run db:seed` | Seed demo data |
 | `npm run db:studio` | Open Prisma Studio (visual DB browser) |
-| `npm run db:reset` | Drop and recreate the database (⚠️ destroys data) |
+| `npm run db:reset` | Drop and recreate the database (destroys data) |
 
 ---
 
