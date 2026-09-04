@@ -1,14 +1,10 @@
 // src/app/api/next-of-kin/[id]/consent/route.ts
-<<<<<<< HEAD
-=======
 // POST /api/next-of-kin/:id/consent — toggle emergency consent for an assignment
 
->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 
-<<<<<<< HEAD
 function getRoleAndActor(request: NextRequest) {
   let role = request.headers.get('x-user-role')
   let actorId = request.headers.get('x-user-id') ?? 'system'
@@ -19,31 +15,11 @@ function getRoleAndActor(request: NextRequest) {
   return { role, actorId }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const { role, actorId } = getRoleAndActor(request)
-  if (role !== 'NEXT_OF_KIN' && role !== 'ADMIN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-
-  const assignment = await prisma.nextOfKinAssignment.findFirst({
-    where: { id: params.id, ...(role === 'NEXT_OF_KIN' ? { kinUserId: actorId } : {}) },
-  })
-  if (!assignment) return NextResponse.json({ success: false, error: 'Assignment not found' }, { status: 404 })
-
-  const newConsentValue = !assignment.emergencyConsentGiven
-  const updated = await prisma.nextOfKinAssignment.update({
-    where: { id: params.id },
-    data: { emergencyConsentGiven: newConsentValue, consentGivenAt: newConsentValue ? new Date() : null },
-  })
-
-  await logAccess({ accessedByUserId: actorId, targetPatientId: assignment.patientId, action: 'EDIT', resourceType: 'NEXT_OF_KIN', resourceId: assignment.id, details: { consentGranted: newConsentValue }, ...getRequestMeta(request) })
-  return NextResponse.json({ success: true, data: updated, message: newConsentValue ? 'Emergency consent granted successfully' : 'Emergency consent has been revoked' })
-}
-=======
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const role = request.headers.get('x-user-role')
-  const actorId = request.headers.get('x-user-id')!
+  const { role, actorId } = getRoleAndActor(request)
 
   // Only the next of kin themselves can grant/revoke consent
   if (role !== 'NEXT_OF_KIN' && role !== 'ADMIN') {
@@ -92,4 +68,3 @@ export async function POST(
       : 'Emergency consent has been revoked',
   })
 }
->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd

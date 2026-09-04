@@ -1,17 +1,13 @@
 // src/app/api/patients/route.ts
-<<<<<<< HEAD
-=======
 // GET /api/patients — list all patients (admin/doctor/receptionist only)
 // POST /api/patients — create a new patient account
 
->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/src/lib/prisma'
 import { CreateUserSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 
-<<<<<<< HEAD
 function getRoleAndActor(request: NextRequest) {
   let role = request.headers.get('x-user-role')
   let actorId = request.headers.get('x-user-id') ?? 'system'
@@ -24,17 +20,11 @@ function getRoleAndActor(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const { role, actorId } = getRoleAndActor(request)
-  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-=======
-export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  const userId = request.headers.get('x-user-id')!
 
   // Only staff roles can list all patients
   if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
   }
->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1', 10)
@@ -42,42 +32,6 @@ export async function GET(request: NextRequest) {
   const skip = (page - 1) * pageSize
 
   const [patients, total] = await Promise.all([
-<<<<<<< HEAD
-    prisma.user.findMany({ where: { role: 'PATIENT', isActive: true }, select: { id: true, email: true, studentNumber: true, fullName: true, phone: true, isActive: true, createdAt: true, patientProfile: true }, orderBy: { fullName: 'asc' }, skip, take: pageSize }),
-    prisma.user.count({ where: { role: 'PATIENT', isActive: true } }),
-  ])
-
-  await logAccess({ accessedByUserId: actorId, action: 'VIEW', resourceType: 'PROFILE', details: { note: 'Listed all patients' }, ...getRequestMeta(request) })
-  return NextResponse.json({ success: true, data: { items: patients, total, page, pageSize, totalPages: Math.ceil(total / pageSize) } })
-}
-
-export async function POST(request: NextRequest) {
-  const { role, actorId } = getRoleAndActor(request)
-  if (!['RECEPTIONIST', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-
-  const body = await request.json()
-  const validation = CreateUserSchema.safeParse(body)
-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
-
-  const data = validation.data
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: data.email.toLowerCase() }, data.studentNumber ? { studentNumber: data.studentNumber } : {}].filter((c) => Object.keys(c).length > 0) },
-  })
-  if (existing) return NextResponse.json({ success: false, error: 'A user with this email or student number already exists' }, { status: 409 })
-
-  const passwordHash = await bcrypt.hash(data.password, 12)
-  const user = await prisma.user.create({
-    data: {
-      email: data.email.toLowerCase(), studentNumber: data.studentNumber || null, passwordHash, role: data.role, fullName: data.fullName, phone: data.phone || null,
-      ...(data.role === 'PATIENT' && { patientProfile: { create: { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null, bloodType: data.bloodType || null, address: data.address || null, emergencyContactName: data.emergencyContactName || null, emergencyContactPhone: data.emergencyContactPhone || null } } }),
-    },
-    select: { id: true, email: true, studentNumber: true, role: true, fullName: true, phone: true, isActive: true, createdAt: true },
-  })
-
-  await logAccess({ accessedByUserId: actorId, targetPatientId: data.role === 'PATIENT' ? user.id : null, action: 'CREATE', resourceType: 'PROFILE', resourceId: user.id, details: { createdRole: data.role }, ...getRequestMeta(request) })
-  return NextResponse.json({ success: true, data: user }, { status: 201 })
-}
-=======
     prisma.user.findMany({
       where: { role: 'PATIENT', isActive: true },
       select: {
@@ -98,7 +52,7 @@ export async function POST(request: NextRequest) {
   ])
 
   await logAccess({
-    accessedByUserId: userId,
+    accessedByUserId: actorId,
     action: 'VIEW',
     resourceType: 'PROFILE',
     details: { note: 'Listed all patients' },
@@ -112,8 +66,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
-  const actorId = request.headers.get('x-user-id')!
+  const { role, actorId } = getRoleAndActor(request)
 
   // Only admin and receptionists can create patient accounts
   if (!['RECEPTIONIST', 'ADMIN'].includes(role || '')) {
@@ -195,4 +148,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ success: true, data: user }, { status: 201 })
 }
->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd

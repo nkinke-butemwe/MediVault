@@ -1,0 +1,824 @@
+diff --git a/src/app/api/access-logs/route.ts b/src/app/api/access-logs/route.ts
+index becdea0..34258e9 100644
+--- a/src/app/api/access-logs/route.ts
++++ b/src/app/api/access-logs/route.ts
+@@ -1,5 +1,6 @@
+ // src/app/api/access-logs/route.ts
+-<<<<<<< HEAD
++// GET /api/access-logs — get all access logs (admin) or own logs (patient)
++
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ 
+@@ -15,45 +16,18 @@ function getRoleAndActor(request: NextRequest) {
+ 
+ export async function GET(request: NextRequest) {
+   const { role, actorId } = getRoleAndActor(request)
+-=======
+-// GET /api/access-logs — get all access logs (admin) or own logs (patient)
+-
+-import { NextRequest, NextResponse } from 'next/server'
+-import { prisma } from '@/src/lib/prisma'
+-
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ 
+   const { searchParams } = new URL(request.url)
+   const page = parseInt(searchParams.get('page') || '1', 10)
+   const pageSize = parseInt(searchParams.get('pageSize') || '25', 10)
+   const skip = (page - 1) * pageSize
+-<<<<<<< HEAD
+-  const filterByAction = searchParams.get('action')
+-  const search = searchParams.get('search')?.trim()
+-
+-  let whereClause: Record<string, unknown> = {}
+-
+-  if (role === 'ADMIN') {
+-    if (filterByAction) whereClause.action = filterByAction
+-    if (search) {
+-      whereClause.OR = [
+-        { accessedBy: { fullName: { contains: search, mode: 'insensitive' } } },
+-        { accessedBy: { email: { contains: search, mode: 'insensitive' } } },
+-        { targetPatient: { fullName: { contains: search, mode: 'insensitive' } } },
+-        { targetPatient: { email: { contains: search, mode: 'insensitive' } } },
+-      ]
+-    }
+-  } else if (role === 'PATIENT') {
+-=======
+ 
+   // Filter parameters (admin only)
+   const filterByUserId = searchParams.get('userId')
+   const filterByPatientId = searchParams.get('patientId')
+   const filterByAction = searchParams.get('action')
+   const filterByResourceType = searchParams.get('resourceType')
++  const search = searchParams.get('search')?.trim()
+ 
+   // Patients can only see logs about their own data
+   // Admins can see all logs with optional filters
+@@ -65,9 +39,16 @@ export async function GET(request: NextRequest) {
+     if (filterByPatientId) whereClause.targetPatientId = filterByPatientId
+     if (filterByAction) whereClause.action = filterByAction
+     if (filterByResourceType) whereClause.resourceType = filterByResourceType
++    if (search) {
++      whereClause.OR = [
++        { accessedBy: { fullName: { contains: search, mode: 'insensitive' } } },
++        { accessedBy: { email: { contains: search, mode: 'insensitive' } } },
++        { targetPatient: { fullName: { contains: search, mode: 'insensitive' } } },
++        { targetPatient: { email: { contains: search, mode: 'insensitive' } } },
++      ]
++    }
+   } else if (role === 'PATIENT') {
+     // Patients only see logs where their record was accessed
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+     whereClause.targetPatientId = actorId
+   } else {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+@@ -77,17 +58,12 @@ export async function GET(request: NextRequest) {
+     prisma.accessLog.findMany({
+       where: whereClause,
+       include: {
+-<<<<<<< HEAD
+-        accessedBy: { select: { id: true, fullName: true, email: true, role: true } },
+-        targetPatient: { select: { id: true, fullName: true, email: true } },
+-=======
+         accessedBy: {
+           select: { id: true, fullName: true, email: true, role: true },
+         },
+         targetPatient: {
+           select: { id: true, fullName: true, email: true },
+         },
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+       },
+       orderBy: { timestamp: 'desc' },
+       skip,
+@@ -98,11 +74,6 @@ export async function GET(request: NextRequest) {
+ 
+   return NextResponse.json({
+     success: true,
+-<<<<<<< HEAD
+-    data: { items: logs, total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
+-  })
+-}
+-=======
+     data: {
+       items: logs,
+       total,
+@@ -112,4 +83,3 @@ export async function GET(request: NextRequest) {
+     },
+   })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/admin/users/route.ts b/src/app/api/admin/users/route.ts
+index 23f58b4..8a4c147 100644
+--- a/src/app/api/admin/users/route.ts
++++ b/src/app/api/admin/users/route.ts
+@@ -8,7 +8,6 @@ import { prisma } from '@/src/lib/prisma'
+ import { CreateUserSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ // Helper: get role and actorId from headers or JWT cookie fallback
+ function getRoleAndActor(request: NextRequest): { role: string | null; actorId: string } {
+   let role = request.headers.get('x-user-role')
+@@ -31,10 +30,6 @@ function getRoleAndActor(request: NextRequest): { role: string | null; actorId:
+ export async function GET(request: NextRequest) {
+   const { role } = getRoleAndActor(request)
+ 
+-=======
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+   if (role !== 'ADMIN') {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+   }
+@@ -84,12 +79,7 @@ export async function GET(request: NextRequest) {
+ }
+ 
+ export async function POST(request: NextRequest) {
+-<<<<<<< HEAD
+   const { role, actorId } = getRoleAndActor(request)
+-=======
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ 
+   if (role !== 'ADMIN') {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+@@ -156,8 +146,4 @@ export async function POST(request: NextRequest) {
+   })
+ 
+   return NextResponse.json({ success: true, data: user }, { status: 201 })
+-<<<<<<< HEAD
+-}
+-=======
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/medical-records/route.ts b/src/app/api/medical-records/route.ts
+index 5a26a65..28843f0 100644
+--- a/src/app/api/medical-records/route.ts
++++ b/src/app/api/medical-records/route.ts
+@@ -1,16 +1,12 @@
+ // src/app/api/medical-records/route.ts
+-<<<<<<< HEAD
+-=======
+ // GET /api/medical-records?patientId=xxx — get records for a patient
+ // POST /api/medical-records — create a new medical record (doctors only)
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { CreateMedicalRecordSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -25,21 +21,6 @@ export async function GET(request: NextRequest) {
+   const { role, actorId } = getRoleAndActor(request)
+   const { searchParams } = new URL(request.url)
+   const patientId = searchParams.get('patientId')
+-  if (!patientId) return NextResponse.json({ success: false, error: 'patientId query parameter is required' }, { status: 400 })
+-
+-  const isOwnRecord = actorId === patientId
+-  const canViewAll = ['DOCTOR', 'ADMIN'].includes(role || '')
+-  if (!isOwnRecord && !canViewAll && role !== 'NEXT_OF_KIN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  if (role === 'NEXT_OF_KIN') {
+-    const assignment = await prisma.nextOfKinAssignment.findFirst({ where: { kinUserId: actorId, patientId, isActive: true } })
+-    if (!assignment) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-=======
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+-  const { searchParams } = new URL(request.url)
+-  const patientId = searchParams.get('patientId')
+ 
+   if (!patientId) {
+     return NextResponse.json({ success: false, error: 'patientId query parameter is required' }, { status: 400 })
+@@ -51,7 +32,7 @@ export async function GET(request: NextRequest) {
+   // - Next of kin can see basic records for their assigned patients
+   const isOwnRecord = actorId === patientId
+   const canViewAll = ['DOCTOR', 'ADMIN'].includes(role || '')
+-  
++
+   if (!isOwnRecord && !canViewAll && role !== 'NEXT_OF_KIN') {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+   }
+@@ -64,21 +45,10 @@ export async function GET(request: NextRequest) {
+     if (!assignment) {
+       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+     }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+   }
+ 
+   const records = await prisma.medicalRecord.findMany({
+     where: { patientId },
+-<<<<<<< HEAD
+-    include: { doctor: { select: { id: true, fullName: true, email: true } } },
+-    orderBy: { visitDate: 'desc' },
+-  })
+-
+-  const formattedRecords = records.map((r) => ({ ...r, medications: r.medications ? JSON.parse(r.medications) : [] }))
+-
+-  if (!isOwnRecord) {
+-    await logAccess({ accessedByUserId: actorId, targetPatientId: patientId, action: 'VIEW', resourceType: 'MEDICAL_RECORD', details: { recordCount: records.length }, ...getRequestMeta(request) })
+-=======
+     include: {
+       doctor: {
+         select: { id: true, fullName: true, email: true },
+@@ -102,42 +72,13 @@ export async function GET(request: NextRequest) {
+       details: { recordCount: records.length },
+       ...getRequestMeta(request),
+     })
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+   }
+ 
+   return NextResponse.json({ success: true, data: formattedRecords })
+ }
+ 
+ export async function POST(request: NextRequest) {
+-<<<<<<< HEAD
+   const { role, actorId } = getRoleAndActor(request)
+-  if (!['DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Only doctors can create medical records' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = CreateMedicalRecordSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const { patientId, diagnosis, medications, allergies, notes, visitDate, followUpDate } = validation.data
+-  const patient = await prisma.user.findFirst({ where: { id: patientId, role: 'PATIENT' } })
+-  if (!patient) return NextResponse.json({ success: false, error: 'Patient not found' }, { status: 404 })
+-
+-  const record = await prisma.medicalRecord.create({
+-    data: {
+-      patientId, doctorId: actorId, diagnosis,
+-      medications: medications ? JSON.stringify(medications) : null,
+-      allergies: allergies || null, notes: notes || null,
+-      visitDate: visitDate ? new Date(visitDate) : new Date(),
+-      followUpDate: followUpDate ? new Date(followUpDate) : null,
+-    },
+-    include: { doctor: { select: { id: true, fullName: true, email: true } } },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: patientId, action: 'CREATE', resourceType: 'MEDICAL_RECORD', resourceId: record.id, details: { diagnosis }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: { ...record, medications: medications || [] } }, { status: 201 })
+-}
+-=======
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+ 
+   // Only doctors (and admins) can create medical records
+   if (!['DOCTOR', 'ADMIN'].includes(role || '')) {
+@@ -199,4 +140,3 @@ export async function POST(request: NextRequest) {
+     { status: 201 }
+   )
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/next-of-kin/[id]/consent/route.ts b/src/app/api/next-of-kin/[id]/consent/route.ts
+index 4d856bf..b5a1a00 100644
+--- a/src/app/api/next-of-kin/[id]/consent/route.ts
++++ b/src/app/api/next-of-kin/[id]/consent/route.ts
+@@ -1,14 +1,10 @@
+ // src/app/api/next-of-kin/[id]/consent/route.ts
+-<<<<<<< HEAD
+-=======
+ // POST /api/next-of-kin/:id/consent — toggle emergency consent for an assignment
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -19,31 +15,11 @@ function getRoleAndActor(request: NextRequest) {
+   return { role, actorId }
+ }
+ 
+-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+-  const { role, actorId } = getRoleAndActor(request)
+-  if (role !== 'NEXT_OF_KIN' && role !== 'ADMIN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const assignment = await prisma.nextOfKinAssignment.findFirst({
+-    where: { id: params.id, ...(role === 'NEXT_OF_KIN' ? { kinUserId: actorId } : {}) },
+-  })
+-  if (!assignment) return NextResponse.json({ success: false, error: 'Assignment not found' }, { status: 404 })
+-
+-  const newConsentValue = !assignment.emergencyConsentGiven
+-  const updated = await prisma.nextOfKinAssignment.update({
+-    where: { id: params.id },
+-    data: { emergencyConsentGiven: newConsentValue, consentGivenAt: newConsentValue ? new Date() : null },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: assignment.patientId, action: 'EDIT', resourceType: 'NEXT_OF_KIN', resourceId: assignment.id, details: { consentGranted: newConsentValue }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: updated, message: newConsentValue ? 'Emergency consent granted successfully' : 'Emergency consent has been revoked' })
+-}
+-=======
+ export async function POST(
+   request: NextRequest,
+   { params }: { params: { id: string } }
+ ) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
++  const { role, actorId } = getRoleAndActor(request)
+ 
+   // Only the next of kin themselves can grant/revoke consent
+   if (role !== 'NEXT_OF_KIN' && role !== 'ADMIN') {
+@@ -92,4 +68,3 @@ export async function POST(
+       : 'Emergency consent has been revoked',
+   })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/next-of-kin/route.ts b/src/app/api/next-of-kin/route.ts
+index b0a6084..f790fde 100644
+--- a/src/app/api/next-of-kin/route.ts
++++ b/src/app/api/next-of-kin/route.ts
+@@ -1,16 +1,12 @@
+ // src/app/api/next-of-kin/route.ts
+-<<<<<<< HEAD
+-=======
+ // GET /api/next-of-kin?patientId=xxx — get next of kin for a patient
+ // POST /api/next-of-kin — create an assignment (patient assigns someone)
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { CreateNextOfKinSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -26,17 +22,6 @@ export async function GET(request: NextRequest) {
+   const { searchParams } = new URL(request.url)
+   const patientId = searchParams.get('patientId')
+ 
+-  if (!patientId && role === 'NEXT_OF_KIN') {
+-    const assignments = await prisma.nextOfKinAssignment.findMany({
+-      where: { kinUserId: actorId, isActive: true },
+-      include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true, patientProfile: true } } },
+-=======
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+-  const { searchParams } = new URL(request.url)
+-  const patientId = searchParams.get('patientId')
+-
+   // Next of kin dashboard: get all patients this user is assigned to
+   if (!patientId && role === 'NEXT_OF_KIN') {
+     const assignments = await prisma.nextOfKinAssignment.findMany({
+@@ -52,23 +37,10 @@ export async function GET(request: NextRequest) {
+           },
+         },
+       },
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+     })
+     return NextResponse.json({ success: true, data: assignments })
+   }
+ 
+-<<<<<<< HEAD
+-  if (!patientId) return NextResponse.json({ success: false, error: 'patientId is required' }, { status: 400 })
+-
+-  const isOwnRecord = actorId === patientId
+-  const canView = ['DOCTOR', 'ADMIN', 'RECEPTIONIST'].includes(role || '')
+-  if (!isOwnRecord && !canView) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const assignments = await prisma.nextOfKinAssignment.findMany({
+-    where: { patientId, isActive: true },
+-    include: { nextOfKin: { select: { id: true, fullName: true, email: true, phone: true } } },
+-  })
+-=======
+   if (!patientId) {
+     return NextResponse.json({ success: false, error: 'patientId is required' }, { status: 400 })
+   }
+@@ -90,38 +62,11 @@ export async function GET(request: NextRequest) {
+     },
+   })
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+   return NextResponse.json({ success: true, data: assignments })
+ }
+ 
+ export async function POST(request: NextRequest) {
+-<<<<<<< HEAD
+   const { role, actorId } = getRoleAndActor(request)
+-  if (!['PATIENT', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = CreateNextOfKinSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const { kinUserId } = validation.data
+-  const patientId = actorId
+-
+-  const kinUser = await prisma.user.findFirst({ where: { id: kinUserId, role: 'NEXT_OF_KIN', isActive: true } })
+-  if (!kinUser) return NextResponse.json({ success: false, error: 'Next of kin user not found or does not have the NEXT_OF_KIN role' }, { status: 404 })
+-
+-  await prisma.nextOfKinAssignment.updateMany({ where: { patientId, isActive: true }, data: { isActive: false } })
+-
+-  const assignment = await prisma.nextOfKinAssignment.create({
+-    data: { patientId, kinUserId },
+-    include: { nextOfKin: { select: { id: true, fullName: true, email: true, phone: true } } },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: patientId, action: 'CREATE', resourceType: 'NEXT_OF_KIN', resourceId: assignment.id, details: { kinUserId }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: assignment }, { status: 201 })
+-}
+-=======
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+ 
+   // Only patients (and admins) can assign a next of kin
+   if (!['PATIENT', 'ADMIN'].includes(role || '')) {
+@@ -180,4 +125,3 @@ export async function POST(request: NextRequest) {
+ 
+   return NextResponse.json({ success: true, data: assignment }, { status: 201 })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/patients/[id]/route.ts b/src/app/api/patients/[id]/route.ts
+index 19fb142..c47473f 100644
+--- a/src/app/api/patients/[id]/route.ts
++++ b/src/app/api/patients/[id]/route.ts
+@@ -1,16 +1,12 @@
+ // src/app/api/patients/[id]/route.ts
+-<<<<<<< HEAD
+-=======
+ // GET /api/patients/:id — get a specific patient's full profile
+ // PUT /api/patients/:id — update a patient's profile
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { UpdatePatientProfileSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -21,55 +17,11 @@ function getRoleAndActor(request: NextRequest) {
+   return { role, actorId }
+ }
+ 
+-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+-  const { role, actorId } = getRoleAndActor(request)
+-  const { id } = params
+-  const isOwnProfile = actorId === id
+-  const isStaff = ['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')
+-  if (!isOwnProfile && !isStaff) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const patient = await prisma.user.findUnique({
+-    where: { id },
+-    select: { id: true, email: true, studentNumber: true, fullName: true, phone: true, isActive: true, role: true, createdAt: true, patientProfile: true },
+-  })
+-  if (!patient || patient.role !== 'PATIENT') return NextResponse.json({ success: false, error: 'Patient not found' }, { status: 404 })
+-
+-  if (!isOwnProfile) {
+-    await logAccess({ accessedByUserId: actorId, targetPatientId: id, action: 'VIEW', resourceType: 'PROFILE', resourceId: id, ...getRequestMeta(request) })
+-  }
+-  return NextResponse.json({ success: true, data: patient })
+-}
+-
+-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+-  const { role, actorId } = getRoleAndActor(request)
+-  const { id } = params
+-  const isOwnProfile = actorId === id
+-  if (!isOwnProfile && role !== 'ADMIN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = UpdatePatientProfileSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const { phone, dateOfBirth, bloodType, address, emergencyContactName, emergencyContactPhone } = validation.data
+-  const [updatedUser] = await prisma.$transaction([
+-    prisma.user.update({ where: { id }, data: { phone: phone ?? undefined }, select: { id: true, email: true, fullName: true, phone: true } }),
+-    prisma.patientProfile.upsert({
+-      where: { userId: id },
+-      update: { dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined, bloodType: bloodType ?? undefined, address: address ?? undefined, emergencyContactName: emergencyContactName ?? undefined, emergencyContactPhone: emergencyContactPhone ?? undefined },
+-      create: { userId: id, dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null, bloodType, address, emergencyContactName, emergencyContactPhone },
+-    }),
+-  ])
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: id, action: 'EDIT', resourceType: 'PROFILE', resourceId: id, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: updatedUser })
+-}
+-=======
+ export async function GET(
+   request: NextRequest,
+   { params }: { params: { id: string } }
+ ) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
++  const { role, actorId } = getRoleAndActor(request)
+   const { id } = params
+ 
+   // Patients can view their own profile; staff can view any patient
+@@ -118,8 +70,7 @@ export async function PUT(
+   request: NextRequest,
+   { params }: { params: { id: string } }
+ ) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
++  const { role, actorId } = getRoleAndActor(request)
+   const { id } = params
+ 
+   // Patients can update their own profile; admins can update any profile
+@@ -178,4 +129,3 @@ export async function PUT(
+ 
+   return NextResponse.json({ success: true, data: updatedUser })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/patients/route.ts b/src/app/api/patients/route.ts
+index c35dc52..9a19ae9 100644
+--- a/src/app/api/patients/route.ts
++++ b/src/app/api/patients/route.ts
+@@ -1,17 +1,13 @@
+ // src/app/api/patients/route.ts
+-<<<<<<< HEAD
+-=======
+ // GET /api/patients — list all patients (admin/doctor/receptionist only)
+ // POST /api/patients — create a new patient account
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import bcrypt from 'bcryptjs'
+ import { prisma } from '@/src/lib/prisma'
+ import { CreateUserSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -24,17 +20,11 @@ function getRoleAndActor(request: NextRequest) {
+ 
+ export async function GET(request: NextRequest) {
+   const { role, actorId } = getRoleAndActor(request)
+-  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-=======
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const userId = request.headers.get('x-user-id')!
+ 
+   // Only staff roles can list all patients
+   if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+   }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ 
+   const { searchParams } = new URL(request.url)
+   const page = parseInt(searchParams.get('page') || '1', 10)
+@@ -42,42 +32,6 @@ export async function GET(request: NextRequest) {
+   const skip = (page - 1) * pageSize
+ 
+   const [patients, total] = await Promise.all([
+-<<<<<<< HEAD
+-    prisma.user.findMany({ where: { role: 'PATIENT', isActive: true }, select: { id: true, email: true, studentNumber: true, fullName: true, phone: true, isActive: true, createdAt: true, patientProfile: true }, orderBy: { fullName: 'asc' }, skip, take: pageSize }),
+-    prisma.user.count({ where: { role: 'PATIENT', isActive: true } }),
+-  ])
+-
+-  await logAccess({ accessedByUserId: actorId, action: 'VIEW', resourceType: 'PROFILE', details: { note: 'Listed all patients' }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: { items: patients, total, page, pageSize, totalPages: Math.ceil(total / pageSize) } })
+-}
+-
+-export async function POST(request: NextRequest) {
+-  const { role, actorId } = getRoleAndActor(request)
+-  if (!['RECEPTIONIST', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = CreateUserSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const data = validation.data
+-  const existing = await prisma.user.findFirst({
+-    where: { OR: [{ email: data.email.toLowerCase() }, data.studentNumber ? { studentNumber: data.studentNumber } : {}].filter((c) => Object.keys(c).length > 0) },
+-  })
+-  if (existing) return NextResponse.json({ success: false, error: 'A user with this email or student number already exists' }, { status: 409 })
+-
+-  const passwordHash = await bcrypt.hash(data.password, 12)
+-  const user = await prisma.user.create({
+-    data: {
+-      email: data.email.toLowerCase(), studentNumber: data.studentNumber || null, passwordHash, role: data.role, fullName: data.fullName, phone: data.phone || null,
+-      ...(data.role === 'PATIENT' && { patientProfile: { create: { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null, bloodType: data.bloodType || null, address: data.address || null, emergencyContactName: data.emergencyContactName || null, emergencyContactPhone: data.emergencyContactPhone || null } } }),
+-    },
+-    select: { id: true, email: true, studentNumber: true, role: true, fullName: true, phone: true, isActive: true, createdAt: true },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: data.role === 'PATIENT' ? user.id : null, action: 'CREATE', resourceType: 'PROFILE', resourceId: user.id, details: { createdRole: data.role }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: user }, { status: 201 })
+-}
+-=======
+     prisma.user.findMany({
+       where: { role: 'PATIENT', isActive: true },
+       select: {
+@@ -98,7 +52,7 @@ export async function POST(request: NextRequest) {
+   ])
+ 
+   await logAccess({
+-    accessedByUserId: userId,
++    accessedByUserId: actorId,
+     action: 'VIEW',
+     resourceType: 'PROFILE',
+     details: { note: 'Listed all patients' },
+@@ -112,8 +66,7 @@ export async function POST(request: NextRequest) {
+ }
+ 
+ export async function POST(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
++  const { role, actorId } = getRoleAndActor(request)
+ 
+   // Only admin and receptionists can create patient accounts
+   if (!['RECEPTIONIST', 'ADMIN'].includes(role || '')) {
+@@ -195,4 +148,3 @@ export async function POST(request: NextRequest) {
+ 
+   return NextResponse.json({ success: true, data: user }, { status: 201 })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/visits/[id]/route.ts b/src/app/api/visits/[id]/route.ts
+index a95bb24..83a72ef 100644
+--- a/src/app/api/visits/[id]/route.ts
++++ b/src/app/api/visits/[id]/route.ts
+@@ -1,15 +1,11 @@
+ // src/app/api/visits/[id]/route.ts
+-<<<<<<< HEAD
+-=======
+ // PUT /api/visits/:id — update visit status and notes
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { UpdateVisitSchema } from '@/src/lib/validators'
+ import { logAccess, getRequestMeta } from '@/src/lib/logger'
+ 
+-<<<<<<< HEAD
+ function getRoleAndActor(request: NextRequest) {
+   let role = request.headers.get('x-user-role')
+   let actorId = request.headers.get('x-user-id') ?? 'system'
+@@ -20,30 +16,11 @@ function getRoleAndActor(request: NextRequest) {
+   return { role, actorId }
+ }
+ 
+-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+-  const { role, actorId } = getRoleAndActor(request)
+-  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = UpdateVisitSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const visit = await prisma.visit.update({
+-    where: { id: params.id },
+-    data: { status: validation.data.status, vitals: validation.data.vitals, doctorNotes: validation.data.doctorNotes, reason: validation.data.reason },
+-    include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true } }, createdBy: { select: { id: true, fullName: true } } },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: visit.patientId, action: 'EDIT', resourceType: 'VISIT', resourceId: visit.id, details: { newStatus: validation.data.status }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: visit })
+-}
+-=======
+ export async function PUT(
+   request: NextRequest,
+   { params }: { params: { id: string } }
+ ) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
++  const { role, actorId } = getRoleAndActor(request)
+ 
+   if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+@@ -84,4 +61,3 @@ export async function PUT(
+ 
+   return NextResponse.json({ success: true, data: visit })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+diff --git a/src/app/api/visits/route.ts b/src/app/api/visits/route.ts
+index de6ff0c..a4f71cd 100644
+--- a/src/app/api/visits/route.ts
++++ b/src/app/api/visits/route.ts
+@@ -1,5 +1,7 @@
+ // src/app/api/visits/route.ts
+-<<<<<<< HEAD
++// GET /api/visits?patientId=xxx — get visits for a patient
++// POST /api/visits — create a new visit (receptionists/doctors)
++
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/src/lib/prisma'
+ import { CreateVisitSchema } from '@/src/lib/validators'
+@@ -20,39 +22,6 @@ export async function GET(request: NextRequest) {
+   const { searchParams } = new URL(request.url)
+   const patientId = searchParams.get('patientId')
+ 
+-  if (!patientId) {
+-    if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-    const today = new Date(); today.setHours(0, 0, 0, 0)
+-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+-    const visits = await prisma.visit.findMany({
+-      where: { visitDate: { gte: today, lt: tomorrow } },
+-      include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true } }, createdBy: { select: { id: true, fullName: true } } },
+-      orderBy: { visitDate: 'asc' },
+-    })
+-    return NextResponse.json({ success: true, data: visits })
+-  }
+-
+-  const isOwnVisit = actorId === patientId
+-  const canViewAll = ['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')
+-  if (!isOwnVisit && !canViewAll) {
+-    if (role === 'NEXT_OF_KIN') {
+-      const assignment = await prisma.nextOfKinAssignment.findFirst({ where: { kinUserId: actorId, patientId, isActive: true } })
+-      if (!assignment) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-=======
+-// GET /api/visits?patientId=xxx — get visits for a patient
+-// POST /api/visits — create a new visit (receptionists/doctors)
+-
+-import { NextRequest, NextResponse } from 'next/server'
+-import { prisma } from '@/src/lib/prisma'
+-import { CreateVisitSchema, UpdateVisitSchema } from '@/src/lib/validators'
+-import { logAccess, getRequestMeta } from '@/src/lib/logger'
+-
+-export async function GET(request: NextRequest) {
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+-  const { searchParams } = new URL(request.url)
+-  const patientId = searchParams.get('patientId')
+-
+   // If no patientId, return today's visits for receptionist dashboard
+   if (!patientId) {
+     if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
+@@ -92,7 +61,6 @@ export async function GET(request: NextRequest) {
+       if (!assignment) {
+         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+       }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+     } else {
+       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+     }
+@@ -100,22 +68,14 @@ export async function GET(request: NextRequest) {
+ 
+   const visits = await prisma.visit.findMany({
+     where: { patientId },
+-<<<<<<< HEAD
+-    include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true } }, createdBy: { select: { id: true, fullName: true } } },
+-=======
+     include: {
+       patient: { select: { id: true, fullName: true, email: true, studentNumber: true } },
+       createdBy: { select: { id: true, fullName: true } },
+     },
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+     orderBy: { visitDate: 'desc' },
+   })
+ 
+   if (!isOwnVisit) {
+-<<<<<<< HEAD
+-    await logAccess({ accessedByUserId: actorId, targetPatientId: patientId, action: 'VIEW', resourceType: 'VISIT', details: { visitCount: visits.length }, ...getRequestMeta(request) })
+-  }
+-=======
+     await logAccess({
+       accessedByUserId: actorId,
+       targetPatientId: patientId,
+@@ -126,34 +86,11 @@ export async function GET(request: NextRequest) {
+     })
+   }
+ 
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
+   return NextResponse.json({ success: true, data: visits })
+ }
+ 
+ export async function POST(request: NextRequest) {
+-<<<<<<< HEAD
+   const { role, actorId } = getRoleAndActor(request)
+-  if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+-
+-  const body = await request.json()
+-  const validation = CreateVisitSchema.safeParse(body)
+-  if (!validation.success) return NextResponse.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, { status: 400 })
+-
+-  const { patientId, reason, vitals, visitDate } = validation.data
+-  const patient = await prisma.user.findFirst({ where: { id: patientId, role: 'PATIENT' } })
+-  if (!patient) return NextResponse.json({ success: false, error: 'Patient not found' }, { status: 404 })
+-
+-  const visit = await prisma.visit.create({
+-    data: { patientId, reason, vitals: vitals || null, visitDate: visitDate ? new Date(visitDate) : new Date(), status: 'WAITING', createdById: actorId },
+-    include: { patient: { select: { id: true, fullName: true, email: true, studentNumber: true } }, createdBy: { select: { id: true, fullName: true } } },
+-  })
+-
+-  await logAccess({ accessedByUserId: actorId, targetPatientId: patientId, action: 'CREATE', resourceType: 'VISIT', resourceId: visit.id, details: { reason }, ...getRequestMeta(request) })
+-  return NextResponse.json({ success: true, data: visit }, { status: 201 })
+-}
+-=======
+-  const role = request.headers.get('x-user-role')
+-  const actorId = request.headers.get('x-user-id')!
+ 
+   if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(role || '')) {
+     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+@@ -204,4 +141,3 @@ export async function POST(request: NextRequest) {
+ 
+   return NextResponse.json({ success: true, data: visit }, { status: 201 })
+ }
+->>>>>>> 24e509d1c2e47ba1acd6cf4a8e84e6ee7b5f38cd
