@@ -1,6 +1,4 @@
 // src/app/dashboard/doctor/page.tsx
-// Doctor dashboard — patient search, full medical history, add records, update visits
-
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -18,7 +16,6 @@ import {
   SaveIcon,
 } from '@/src/components/icons'
 
-// Patient search result type
 interface PatientSearchResult {
   id: string
   fullName: string
@@ -28,7 +25,6 @@ interface PatientSearchResult {
   patientProfile: { bloodType: string | null; dateOfBirth: string | null } | null
 }
 
-// ── Visit Status Badge ────────────────────────────────────────────────────────
 function VisitStatusBadge({ status }: { status: string }) {
   const classes: Record<string, string> = {
     WAITING: 'bg-yellow-100 text-yellow-800',
@@ -47,49 +43,37 @@ function VisitStatusBadge({ status }: { status: string }) {
 export default function DoctorDashboard() {
   const { user } = useAuth()
 
-  // Patient search
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<PatientSearchResult[]>([])
   const [searching, setSearching] = useState(false)
-
-  // Selected patient + their data
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null)
   const [patientRecords, setPatientRecords] = useState<MedicalRecord[]>([])
   const [patientVisits, setPatientVisits] = useState<Visit[]>([])
   const [loadingPatientData, setLoadingPatientData] = useState(false)
-
-  // Active section
-  const [activeSection, setActiveSection] = useState<'search' | 'add-record'>('search')
-
-  // New medical record form state
-  const [newRecord, setNewRecord] = useState({
-    diagnosis: '',
-    allergies: '',
-    notes: '',
-    followUpDate: '',
-  })
-  // Medications list in the new record form
+  const [activeSection, setActiveSection] = useState<'search' | 'add-record' | 'prescribe'>('search')
+  const [newRecord, setNewRecord] = useState({ diagnosis: '', allergies: '', notes: '', followUpDate: '' })
   const [medications, setMedications] = useState<Medication[]>([{ name: '', dose: '', duration: '' }])
   const [savingRecord, setSavingRecord] = useState(false)
+  const [lastSavedRecordId, setLastSavedRecordId] = useState<string | null>(null)
 
-  // ── Search patients ────────────────────────────────────────────────────────
+  // Prescription form state
+  const [prescriptionMeds, setPrescriptionMeds] = useState<(Medication & { quantity: string })[]>([
+    { name: '', dose: '', duration: '', quantity: '' }
+  ])
+  const [prescriptionNotes, setPrescriptionNotes] = useState('')
+  const [sendingPrescription, setSendingPrescription] = useState(false)
+
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query)
-    if (query.length < 2) {
-      setSearchResults([])
-      return
-    }
+    if (query.length < 2) { setSearchResults([]); return }
     setSearching(true)
     try {
       const res = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}`)
       const data = await res.json()
       if (data.success) setSearchResults(data.data)
-    } finally {
-      setSearching(false)
-    }
+    } finally { setSearching(false) }
   }, [])
 
-  // ── Select a patient and load their records + visits ──────────────────────
   const handleSelectPatient = async (patient: PatientSearchResult) => {
     setSelectedPatient(patient)
     setSearchResults([])
@@ -103,42 +87,21 @@ export default function DoctorDashboard() {
       const [recData, visitData] = await Promise.all([recRes.json(), visitRes.json()])
       if (recData.success) setPatientRecords(recData.data)
       if (visitData.success) setPatientVisits(visitData.data)
-    } catch {
-      toast.error('Failed to load patient data')
-    } finally {
-      setLoadingPatientData(false)
-    }
+    } catch { toast.error('Failed to load patient data') }
+    finally { setLoadingPatientData(false) }
   }
 
-  // ── Add a medication row ───────────────────────────────────────────────────
-  const addMedication = () => {
-    setMedications([...medications, { name: '', dose: '', duration: '' }])
-  }
-
+  const addMedication = () => setMedications([...medications, { name: '', dose: '', duration: '' }])
   const updateMedication = (index: number, field: keyof Medication, value: string) => {
-    const updated = medications.map((med, i) =>
-      i === index ? { ...med, [field]: value } : med
-    )
-    setMedications(updated)
+    setMedications(medications.map((med, i) => i === index ? { ...med, [field]: value } : med))
   }
+  const removeMedication = (index: number) => setMedications(medications.filter((_, i) => i !== index))
 
-  const removeMedication = (index: number) => {
-    setMedications(medications.filter((_, i) => i !== index))
-  }
-
-  // ── Save new medical record ────────────────────────────────────────────────
   const handleSaveRecord = async () => {
-    if (!selectedPatient) {
-      toast.error('Please select a patient first')
-      return
-    }
-    if (!newRecord.diagnosis.trim()) {
-      toast.error('Diagnosis is required')
-      return
-    }
+    if (!selectedPatient) { toast.error('Please select a patient first'); return }
+    if (!newRecord.diagnosis.trim()) { toast.error('Diagnosis is required'); return }
     setSavingRecord(true)
     try {
-      // Filter out empty medication rows before saving
       const validMeds = medications.filter(m => m.name.trim())
       const res = await fetch('/api/medical-records', {
         method: 'POST',
@@ -155,20 +118,51 @@ export default function DoctorDashboard() {
       const data = await res.json()
       if (data.success) {
         toast.success('Medical record saved successfully')
+        setLastSavedRecordId(data.data.id)
+        // Pre-fill prescription meds from the record
+        if (validMeds.length > 0) {
+          setPrescriptionMeds(validMeds.map(m => ({ ...m, quantity: '' })))
+        }
         setNewRecord({ diagnosis: '', allergies: '', notes: '', followUpDate: '' })
         setMedications([{ name: '', dose: '', duration: '' }])
-        // Reload the patient's records
         handleSelectPatient(selectedPatient)
-        setActiveSection('search')
+        // Ask doctor if they want to send to pharmacy
+        setActiveSection('prescribe')
       } else {
         toast.error(data.error || 'Failed to save record')
       }
-    } finally {
-      setSavingRecord(false)
-    }
+    } finally { setSavingRecord(false) }
   }
 
-  // ── Update visit status ────────────────────────────────────────────────────
+  const handleSendPrescription = async () => {
+    if (!selectedPatient) return
+    const validMeds = prescriptionMeds.filter(m => m.name.trim())
+    if (validMeds.length === 0) { toast.error('Add at least one medication'); return }
+    setSendingPrescription(true)
+    try {
+      const res = await fetch('/api/prescriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: selectedPatient.id,
+          medications: validMeds,
+          medicalRecordId: lastSavedRecordId || null,
+          notes: prescriptionNotes || null,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Prescription sent to pharmacy successfully')
+        setPrescriptionMeds([{ name: '', dose: '', duration: '', quantity: '' }])
+        setPrescriptionNotes('')
+        setLastSavedRecordId(null)
+        setActiveSection('search')
+      } else {
+        toast.error(data.error || 'Failed to send prescription')
+      }
+    } finally { setSendingPrescription(false) }
+  }
+
   const handleUpdateVisitStatus = async (visitId: string, status: string) => {
     try {
       const res = await fetch(`/api/visits/${visitId}`, {
@@ -180,82 +174,49 @@ export default function DoctorDashboard() {
       if (data.success) {
         toast.success('Visit updated')
         if (selectedPatient) handleSelectPatient(selectedPatient)
-      } else {
-        toast.error(data.error || 'Failed to update visit')
-      }
-    } catch {
-      toast.error('Network error')
-    }
+      } else { toast.error(data.error || 'Failed to update visit') }
+    } catch { toast.error('Network error') }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-[#0f3b5c]">Doctor Dashboard</h1>
         <p className="text-slate-500 text-sm mt-1">Welcome, {user?.fullName}</p>
       </div>
 
       {/* Section tabs */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setActiveSection('search')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${
-            activeSection === 'search'
-              ? 'bg-[#0f3b5c] text-white shadow'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <SearchIcon size={16} />
-          Patient Search & History
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setActiveSection('search')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'search' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <SearchIcon size={16} /> Patient Search & History
         </button>
-        <button
-          onClick={() => {
-            if (!selectedPatient) {
-              toast.error('Please select a patient first')
-              return
-            }
-            setActiveSection('add-record')
-          }}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${
-            activeSection === 'add-record'
-              ? 'bg-[#0f3b5c] text-white shadow'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <ClipboardIcon size={16} />
-          Add Medical Record
+        <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('add-record') }}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'add-record' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <ClipboardIcon size={16} /> Add Medical Record
+        </button>
+        <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('prescribe') }}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'prescribe' ? 'bg-green-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <PillIcon size={16} /> Send Prescription
         </button>
       </div>
 
-      {/* ── Patient Search Section ─────────────────────────────────────────── */}
+      {/* Patient Search */}
       {activeSection === 'search' && (
         <div className="space-y-4">
-          {/* Search input */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <h2 className="text-base font-semibold text-[#0f3b5c] mb-3">Search Patients</h2>
             <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+              <input type="text" value={searchQuery} onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Search by name, email, or student number..."
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c] pr-10"
-              />
-              {searching && (
-                <div className="absolute right-3 top-3.5 w-5 h-5 border-2 border-[#0f3b5c] border-t-transparent rounded-full animate-spin" />
-              )}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c] pr-10" />
+              {searching && <div className="absolute right-3 top-3.5 w-5 h-5 border-2 border-[#0f3b5c] border-t-transparent rounded-full animate-spin" />}
             </div>
-
-            {/* Search results dropdown */}
             {searchResults.length > 0 && (
               <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 {searchResults.map((patient) => (
-                  <button
-                    key={patient.id}
-                    onClick={() => handleSelectPatient(patient)}
-                    className="w-full text-left px-4 py-3 hover:bg-[#e6f0f9] transition-colors border-b border-slate-100 last:border-0"
-                  >
+                  <button key={patient.id} onClick={() => handleSelectPatient(patient)}
+                    className="w-full text-left px-4 py-3 hover:bg-[#e6f0f9] transition-colors border-b border-slate-100 last:border-0">
                     <div className="flex justify-between items-center">
                       <div>
                         <span className="font-medium text-slate-800">{patient.fullName}</span>
@@ -269,11 +230,9 @@ export default function DoctorDashboard() {
             )}
           </div>
 
-          {/* Selected patient details */}
           {selectedPatient && (
             <div className="space-y-4">
-              {/* Patient info banner */}
-              <div className="bg-[#0f3b5c] rounded-2xl p-5 text-white flex justify-between items-center">
+              <div className="bg-[#0f3b5c] rounded-2xl p-5 text-white flex justify-between items-center flex-wrap gap-3">
                 <div>
                   <h3 className="text-xl font-bold">{selectedPatient.fullName}</h3>
                   <p className="text-blue-200 text-sm mt-0.5">
@@ -282,12 +241,16 @@ export default function DoctorDashboard() {
                     {selectedPatient.patientProfile?.bloodType && ` · Blood: ${selectedPatient.patientProfile.bloodType}`}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveSection('add-record')}
-                  className="bg-white text-[#0f3b5c] px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-all"
-                >
-                  + Add Record
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => setActiveSection('add-record')}
+                    className="bg-white text-[#0f3b5c] px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-all">
+                    + Add Record
+                  </button>
+                  <button onClick={() => setActiveSection('prescribe')}
+                    className="bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-600 transition-all">
+                    💊 Prescribe
+                  </button>
+                </div>
               </div>
 
               {loadingPatientData ? (
@@ -296,7 +259,6 @@ export default function DoctorDashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Medical Records */}
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                     <div className="p-5 border-b border-slate-100">
                       <h3 className="font-semibold text-[#0f3b5c]">Medical Records ({patientRecords.length})</h3>
@@ -309,35 +271,28 @@ export default function DoctorDashboard() {
                           <div key={record.id} className="p-5">
                             <div className="flex justify-between items-start mb-2">
                               <h4 className="font-semibold text-slate-800">{record.diagnosis}</h4>
-                              <span className="text-xs text-slate-400">
-                                {new Date(record.visitDate).toLocaleDateString()}
-                              </span>
+                              <span className="text-xs text-slate-400">{new Date(record.visitDate).toLocaleDateString()}</span>
                             </div>
                             {record.allergies && (
                               <p className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg inline-flex items-center gap-1.5 mb-2">
-                                <AlertTriangleIcon size={13} />
-                                Allergies: {record.allergies}
+                                <AlertTriangleIcon size={13} /> Allergies: {record.allergies}
                               </p>
                             )}
                             {record.medications && (record.medications as Medication[]).length > 0 && (
                               <div className="flex flex-wrap gap-2 mb-2">
                                 {(record.medications as Medication[]).map((med: Medication, i: number) => (
                                   <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full inline-flex items-center gap-1">
-                                    <PillIcon size={12} />
-                                    {med.name} {med.dose}
+                                    <PillIcon size={12} /> {med.name} {med.dose}
                                   </span>
                                 ))}
                               </div>
                             )}
                             {record.notes && (
-                              <p className="text-xs text-slate-500 italic border-l-2 border-slate-200 pl-3 mt-2">
-                                {record.notes}
-                              </p>
+                              <p className="text-xs text-slate-500 italic border-l-2 border-slate-200 pl-3 mt-2">{record.notes}</p>
                             )}
                             {record.followUpDate && (
                               <p className="text-xs text-blue-600 mt-2 inline-flex items-center gap-1.5">
-                                <CalendarIcon size={13} />
-                                Follow-up: {new Date(record.followUpDate).toLocaleDateString()}
+                                <CalendarIcon size={13} /> Follow-up: {new Date(record.followUpDate).toLocaleDateString()}
                               </p>
                             )}
                           </div>
@@ -346,7 +301,6 @@ export default function DoctorDashboard() {
                     )}
                   </div>
 
-                  {/* Visit History */}
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                     <div className="p-5 border-b border-slate-100">
                       <h3 className="font-semibold text-[#0f3b5c]">Visit History ({patientVisits.length})</h3>
@@ -363,25 +317,19 @@ export default function DoctorDashboard() {
                                 {new Date(visit.visitDate).toLocaleDateString()}
                                 {visit.vitals && ` · ${visit.vitals}`}
                               </p>
-                              {visit.doctorNotes && (
-                                <p className="text-xs text-slate-400 mt-1 italic">{visit.doctorNotes}</p>
-                              )}
+                              {visit.doctorNotes && <p className="text-xs text-slate-400 mt-1 italic">{visit.doctorNotes}</p>}
                             </div>
                             <div className="flex items-center gap-3">
                               <VisitStatusBadge status={visit.status} />
                               {visit.status === 'CHECKED_IN' && (
-                                <button
-                                  onClick={() => handleUpdateVisitStatus(visit.id, 'IN_CONSULTATION')}
-                                  className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-lg hover:bg-purple-200"
-                                >
+                                <button onClick={() => handleUpdateVisitStatus(visit.id, 'IN_CONSULTATION')}
+                                  className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-lg hover:bg-purple-200">
                                   Start Consult
                                 </button>
                               )}
                               {visit.status === 'IN_CONSULTATION' && (
-                                <button
-                                  onClick={() => handleUpdateVisitStatus(visit.id, 'CHECKED_OUT')}
-                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200"
-                                >
+                                <button onClick={() => handleUpdateVisitStatus(visit.id, 'CHECKED_OUT')}
+                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200">
                                   Complete
                                 </button>
                               )}
@@ -398,7 +346,7 @@ export default function DoctorDashboard() {
         </div>
       )}
 
-      {/* ── Add Medical Record Section ─────────────────────────────────────── */}
+      {/* Add Medical Record */}
       {activeSection === 'add-record' && selectedPatient && (
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <div className="flex justify-between items-center mb-5">
@@ -406,67 +354,39 @@ export default function DoctorDashboard() {
               <h2 className="text-lg font-semibold text-[#0f3b5c]">New Medical Record</h2>
               <p className="text-sm text-slate-500">Patient: <strong>{selectedPatient.fullName}</strong></p>
             </div>
-            <button
-              onClick={() => setActiveSection('search')}
-              className="text-sm text-slate-500 hover:text-[#0f3b5c] inline-flex items-center gap-1.5"
-            >
-              <ArrowLeftIcon size={14} />
-              Back to history
+            <button onClick={() => setActiveSection('search')}
+              className="text-sm text-slate-500 hover:text-[#0f3b5c] inline-flex items-center gap-1.5">
+              <ArrowLeftIcon size={14} /> Back to history
             </button>
           </div>
-
           <div className="space-y-4">
-            {/* Diagnosis */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Diagnosis *</label>
-              <input
-                type="text"
-                value={newRecord.diagnosis}
+              <input type="text" value={newRecord.diagnosis}
                 onChange={(e) => setNewRecord({ ...newRecord, diagnosis: e.target.value })}
                 placeholder="e.g. Acute Pharyngitis, Malaria, Tension Headache"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-              />
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
             </div>
-
-            {/* Medications */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="text-xs font-semibold text-slate-600">Medications</label>
-                <button
-                  onClick={addMedication}
-                  className="text-xs text-[#0f3b5c] hover:underline"
-                >
-                  + Add medication
-                </button>
+                <button onClick={addMedication} className="text-xs text-[#0f3b5c] hover:underline">+ Add medication</button>
               </div>
               <div className="space-y-2">
                 {medications.map((med, index) => (
                   <div key={index} className="grid grid-cols-3 gap-2">
-                    <input
-                      value={med.name}
-                      onChange={(e) => updateMedication(index, 'name', e.target.value)}
+                    <input value={med.name} onChange={(e) => updateMedication(index, 'name', e.target.value)}
                       placeholder="Drug name"
-                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-                    />
-                    <input
-                      value={med.dose}
-                      onChange={(e) => updateMedication(index, 'dose', e.target.value)}
+                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
+                    <input value={med.dose} onChange={(e) => updateMedication(index, 'dose', e.target.value)}
                       placeholder="Dose (e.g. 500mg)"
-                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-                    />
+                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
                     <div className="flex gap-2">
-                      <input
-                        value={med.duration}
-                        onChange={(e) => updateMedication(index, 'duration', e.target.value)}
+                      <input value={med.duration} onChange={(e) => updateMedication(index, 'duration', e.target.value)}
                         placeholder="Duration (e.g. 7 days)"
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-                      />
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
                       {medications.length > 1 && (
-                        <button
-                          onClick={() => removeMedication(index)}
-                          className="text-red-400 hover:text-red-600 px-2"
-                          title="Remove this medication"
-                        >
+                        <button onClick={() => removeMedication(index)} className="text-red-400 hover:text-red-600 px-2">
                           <CloseIcon size={14} />
                         </button>
                       )}
@@ -475,63 +395,111 @@ export default function DoctorDashboard() {
                 ))}
               </div>
             </div>
-
-            {/* Allergies */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Known Allergies</label>
-              <input
-                type="text"
-                value={newRecord.allergies}
+              <input type="text" value={newRecord.allergies}
                 onChange={(e) => setNewRecord({ ...newRecord, allergies: e.target.value })}
                 placeholder="e.g. Penicillin, NSAIDs, Pollen (or leave blank)"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-              />
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
             </div>
-
-            {/* Clinical Notes */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Clinical Notes</label>
-              <textarea
-                value={newRecord.notes}
-                onChange={(e) => setNewRecord({ ...newRecord, notes: e.target.value })}
-                rows={3}
-                placeholder="Additional observations, treatment plan, patient instructions..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c] resize-none"
-              />
+              <textarea value={newRecord.notes} onChange={(e) => setNewRecord({ ...newRecord, notes: e.target.value })}
+                rows={3} placeholder="Additional observations, treatment plan, patient instructions..."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c] resize-none" />
             </div>
-
-            {/* Follow-up date */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Follow-up Date (optional)</label>
-              <input
-                type="date"
-                value={newRecord.followUpDate}
+              <input type="date" value={newRecord.followUpDate}
                 onChange={(e) => setNewRecord({ ...newRecord, followUpDate: e.target.value })}
-                className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]"
-              />
+                className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
             </div>
-
-            {/* Save button */}
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSaveRecord}
-                disabled={savingRecord}
-                className="bg-[#0f3b5c] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#0a2c45] transition-all disabled:opacity-60 inline-flex items-center justify-center gap-2"
-              >
-                {savingRecord ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <SaveIcon size={16} />
-                    Save Medical Record
-                  </>
-                )}
+              <button onClick={handleSaveRecord} disabled={savingRecord}
+                className="bg-[#0f3b5c] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#0a2c45] transition-all disabled:opacity-60 inline-flex items-center justify-center gap-2">
+                {savingRecord ? 'Saving...' : <><SaveIcon size={16} /> Save & Go to Prescription</>}
               </button>
-              <button
-                onClick={() => setActiveSection('search')}
-                className="bg-slate-100 text-slate-600 px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-all"
-              >
+              <button onClick={() => setActiveSection('search')}
+                className="bg-slate-100 text-slate-600 px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-all">
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Prescription to Pharmacy */}
+      {activeSection === 'prescribe' && selectedPatient && (
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="flex justify-between items-center mb-5">
+            <div>
+              <h2 className="text-lg font-semibold text-[#0f3b5c]">💊 Send Prescription to Pharmacy</h2>
+              <p className="text-sm text-slate-500">Patient: <strong>{selectedPatient.fullName}</strong></p>
+            </div>
+            <button onClick={() => setActiveSection('search')}
+              className="text-sm text-slate-500 hover:text-[#0f3b5c] inline-flex items-center gap-1.5">
+              <ArrowLeftIcon size={14} /> Back
+            </button>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5">
+            <p className="text-green-700 text-sm font-medium">
+              This prescription will appear in the pharmacist's queue as PENDING and will be dispensed by the pharmacy.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-semibold text-slate-600">Medications to Prescribe</label>
+                <button onClick={() => setPrescriptionMeds([...prescriptionMeds, { name: '', dose: '', duration: '', quantity: '' }])}
+                  className="text-xs text-[#0f3b5c] hover:underline">+ Add medication</button>
+              </div>
+              <div className="space-y-2">
+                {prescriptionMeds.map((med, index) => (
+                  <div key={index} className="grid grid-cols-4 gap-2">
+                    <input value={med.name}
+                      onChange={(e) => setPrescriptionMeds(prescriptionMeds.map((m, i) => i === index ? { ...m, name: e.target.value } : m))}
+                      placeholder="Drug name"
+                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
+                    <input value={med.dose}
+                      onChange={(e) => setPrescriptionMeds(prescriptionMeds.map((m, i) => i === index ? { ...m, dose: e.target.value } : m))}
+                      placeholder="Dose e.g. 500mg"
+                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
+                    <input value={med.duration}
+                      onChange={(e) => setPrescriptionMeds(prescriptionMeds.map((m, i) => i === index ? { ...m, duration: e.target.value } : m))}
+                      placeholder="Duration e.g. 7 days"
+                      className="px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
+                    <div className="flex gap-2">
+                      <input value={med.quantity}
+                        onChange={(e) => setPrescriptionMeds(prescriptionMeds.map((m, i) => i === index ? { ...m, quantity: e.target.value } : m))}
+                        placeholder="Qty e.g. 14"
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0f3b5c]" />
+                      {prescriptionMeds.length > 1 && (
+                        <button onClick={() => setPrescriptionMeds(prescriptionMeds.filter((_, i) => i !== index))}
+                          className="text-red-400 hover:text-red-600 px-2">
+                          <CloseIcon size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Notes for Pharmacist</label>
+              <textarea value={prescriptionNotes} onChange={(e) => setPrescriptionNotes(e.target.value)}
+                rows={2} placeholder="Any special instructions for the pharmacist..."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3b5c] resize-none" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSendPrescription} disabled={sendingPrescription}
+                className="bg-green-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700 transition-all disabled:opacity-60 inline-flex items-center gap-2">
+                {sendingPrescription ? 'Sending...' : '💊 Send to Pharmacy'}
+              </button>
+              <button onClick={() => setActiveSection('search')}
+                className="bg-slate-100 text-slate-600 px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-all">
+                Skip
               </button>
             </div>
           </div>
