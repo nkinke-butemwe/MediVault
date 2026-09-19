@@ -4,15 +4,7 @@
 
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/src/lib/auth'
-
-// Role-to-dashboard mapping
-const ROLE_DASHBOARDS: Record<string, string> = {
-  PATIENT: '/dashboard/patient',
-  RECEPTIONIST: '/dashboard/receptionist',
-  DOCTOR: '/dashboard/doctor',
-  ADMIN: '/dashboard/admin',
-  NEXT_OF_KIN: '/dashboard/next-of-kin',
-}
+import { getDashboardPath } from '@/src/lib/roles'
 
 export default async function HomePage() {
   // Check if the user is already logged in
@@ -20,7 +12,7 @@ export default async function HomePage() {
 
   // If they are, redirect them straight to their dashboard
   if (user) {
-    redirect(ROLE_DASHBOARDS[user.role] || '/login')
+    redirect(getDashboardPath(user.role))
   }
 
   // Otherwise redirect to login (the landing page is static HTML,

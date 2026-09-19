@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import type { AuthUser, Role } from '@/src/types'
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '@/src/components/icons'
 import Modal from '@/src/components/Modal'
+import { formatDate } from '@/src/lib/format'
 
 const ROLE_COLORS: Record<string, string> = {
   PATIENT: 'bg-teal-100 text-teal-800',
@@ -223,7 +224,7 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-slate-400 text-xs">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {formatDate(user.createdAt)}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex gap-2">

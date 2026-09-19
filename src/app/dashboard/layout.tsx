@@ -7,6 +7,12 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import type { AuthUser, Role } from '@/src/types'
+import DashboardSkeleton from '@/src/components/DashboardSkeleton'
+import {
+  HASH_CHANGE_EVENT,
+  setUrlHash,
+  useCurrentHash,
+} from '@/src/hooks/useHashSection'
 import {
   HomeIcon,
   FileTextIcon,
@@ -73,6 +79,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<AuthUser | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [loading, setLoading] = useState(true)
+  // True from the moment Logout is clicked, so we can show the skeleton at once
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  // The "#section" part of the URL, used to highlight the right sidebar link
+  const currentHash = useCurrentHash(pathname)
+
+  // When we arrive on a new page through the sidebar (for example from the
+  // admin Users page to /dashboard/patient#records), the page has just
+  // mounted. Tell it to re-read the URL hash now that the URL is final.
+  useEffect(() => {
+    window.dispatchEvent(new Event(HASH_CHANGE_EVENT))
+  }, [pathname])
+
+  // Sidebar link click.
+  // If the link points at the page we are ALREADY on, Next.js does not
+  // re-render anything for a hash-only change, so we handle it ourselves:
+  // update the URL hash and let the page switch its section.
+  const handleNavClick = (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    const [linkPath, linkHash = ''] = href.split('#')
+
+    // Different page: let the normal Link navigation happen
+    if (linkPath !== pathname) return
+
+    event.preventDefault()
+    setUrlHash(linkHash, 'push')
+
+    // Links like "#patients" point at a spot on the page rather than a tab,
+    // so scroll that element into view if it exists.
+    if (linkHash) {
+      document.getElementById(linkHash)?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -88,12 +126,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .finally(() => setLoading(false))
   }, [router])
 
+  // Load the login page in the background while the user is still on the
+  // dashboard, so it appears faster after logging out
+  useEffect(() => {
+    router.prefetch('/login')
+  }, [router])
+
   const handleLogout = async () => {
+    // Show the skeleton IMMEDIATELY, before waiting for the server, so the
+    // screen reacts the instant the button is pressed
+    setLoggingOut(true)
+
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
       toast.success('Logged out successfully')
+      // Keep the skeleton up; it disappears when the login page replaces this layout
       router.push('/login')
     } catch {
+      // Logout failed, so bring the dashboard back
+      setLoggingOut(false)
       toast.error('Logout failed')
     }
   }
@@ -108,6 +159,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     )
   }
+
+  // Logout in progress: show the skeleton instead of the dashboard
+  if (loggingOut) return <DashboardSkeleton />
 
   if (!user) return null
 
@@ -152,12 +206,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav items */}
         <nav className="flex-1 py-4 px-2">
           {navItems.map((item) => {
-            const isActive = pathname === item.href.split('#')[0]
+            // A link is active when the page AND the #section both match.
+            // A link with no #section is active when the URL has no hash.
+            const [itemPath, itemHash = ''] = item.href.split('#')
+            const isActive = pathname === itemPath && currentHash === itemHash
             const ItemIcon = item.icon
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={(event) => handleNavClick(event, item.href)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 transition-all text-sm ${
                   isActive
                     ? 'bg-white/20 text-white font-semibold'

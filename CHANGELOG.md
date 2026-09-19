@@ -19,6 +19,54 @@ should not be edited once later versions exist.
 
 ### Fixed
 
+- **Sidebar links did nothing on every account.** The Patient,
+  Receptionist, Doctor, Next of Kin and Pharmacist dashboards are each a
+  single page whose sections (tabs) are chosen by React state, while the
+  sidebar links point at URLs like `/dashboard/patient#records`. Nothing on
+  those pages ever read the `#records` part of the URL, and Next.js does
+  not re-render a page for a hash-only change, so clicking a sidebar link
+  changed the address bar at most and the screen stayed the same.
+  - Added `src/hooks/useHashSection.ts`. The URL hash is now the source of
+    truth for the active section. Pages use `useHashSection()` instead of
+    `useState()`, so the sidebar, the tab buttons, the browser back
+    button and direct links all stay in sync.
+  - `src/app/dashboard/layout.tsx` now handles clicks on links that point
+    at the current page (updates the hash itself) and highlights the
+    sidebar item that matches both the page and the section. Previously
+    every link on the same page was highlighted at once.
+  - Updated the patient, receptionist, doctor and pharmacy dashboards to
+    use the hook. On the doctor dashboard, "Add Record" and "Send
+    Prescription" need a selected patient, so choosing them from the
+    sidebar without one shows the search view with a short notice.
+  - Added `id="patients"` to the Next of Kin patient list so its sidebar
+    link scrolls to it.
+- **Admin "Access Logs" (sidebar, stat card and quick action) led to a
+  404.** The `/dashboard/admin/logs` page was linked in three places but
+  had never been created. Added it (`src/app/dashboard/admin/logs/page.tsx`)
+  using the existing `GET /api/access-logs` endpoint, with search,
+  pagination and a CSV export button.
+- **`.gitignore` contained `logs/`, which would have hidden the new admin
+  logs page from Git** because that pattern matches a folder named `logs`
+  anywhere in the project. Changed it to `/logs/` (project root only).
+- **Pharmacist login opened the patient dashboard first and only switched
+  after the page was interacted with.** The login page, the root page and
+  the `useAuth` hook each kept their own copy of the role-to-dashboard map,
+  and none contained `PHARMACIST`, so the lookup fell back to
+  `/dashboard/patient`. The `Role` type in `src/types/index.ts` was also
+  missing `PHARMACIST`.
+  - Added `src/lib/roles.ts` as the single source of truth
+    (`ROLE_DASHBOARDS`, `getDashboardPath`) and switched the login page,
+    root page and `useAuth` to use it.
+  - An unknown role now goes to `/login` instead of silently landing on
+    the patient dashboard.
+  - Added `PHARMACIST` to the `Role` type.
+- **Doctor names showed as "Dr. Dr. Grace Phiri" on the patient's medical
+  records.** The seed data stores names with the title included
+  ("Dr. Grace Phiri") and the patient dashboard added another "Dr. " in
+  front. Added `formatDoctorName()` in `src/lib/format.ts`, which strips
+  any existing title before adding exactly one, and used it in both places
+  on the patient dashboard.
+
 - **"Create User" modal on the admin User Management page rendered off
   screen / cut off instead of centered.** The dashboard layout wraps every
   page's content in a `div` with the `animate-fade-in` class, which plays
@@ -44,6 +92,48 @@ should not be edited once later versions exist.
   - Updated `src/app/dashboard/admin/users/page.tsx` to use the new
     `Modal` component for both the "Create User" and "Reset Password"
     dialogs.
+- **Dates were shown as m/d/yyyy (for example 3/4/2026) instead of the
+  day-first dd/mm/yyyy format used in Zambia.** Every date was printed with
+  `toLocaleDateString()` / `toLocaleString()`, which follow the *browser's*
+  language setting, so a browser set to English (US) printed the American
+  order. That is ambiguous as well as unfamiliar: 3/4/2026 is 4 March in
+  Zambia but reads as 3 April in the US format.
+  - Added `formatDate()` (`04/03/2026`) and `formatDateTime()`
+    (`04/03/2026, 14:30`, 24-hour clock) to `src/lib/format.ts`. They
+    build the text by hand so the result is identical on every computer,
+    and show `—` for a missing or invalid date instead of "Invalid Date".
+  - Replaced all `toLocaleDateString()` / `toLocaleString()` calls on the
+    patient, doctor, next of kin, pharmacy, admin users and admin logs
+    pages. The long header dates (for example "Saturday, 19 September
+    2026") already spell out the month, so they were left alone.
+
+### Changed
+
+- **Removed emoji from the prescription buttons and headings**, in line
+  with the rest of the UI using the SVG icon set instead of emoji:
+  "Prescribe" (patient header card), "Send Prescription to Pharmacy"
+  (form heading) and "Send to Pharmacy" (submit button) on the doctor
+  dashboard, and the check mark on "Mark Dispensed" plus stray leading
+  spaces on the two tab labels on the pharmacy dashboard.
+- **Logging out now shows a skeleton loading screen straight away.**
+  Previously nothing changed on screen until the logout request finished
+  and the login page loaded, which felt like a delay or a frozen button.
+  - Added `src/components/DashboardSkeleton.tsx`, a grey pulsing
+    placeholder shaped like the dashboard (sidebar, header, stat cards).
+  - `handleLogout` in `src/app/dashboard/layout.tsx` switches to it the
+    instant the button is clicked. If the logout request fails, the
+    dashboard comes back with an error message.
+  - The layout also prefetches `/login` so the login page loads faster
+    after logout.
+
+### Tests
+
+- Added `tests/unit/roles-and-format.test.ts` covering the role-to-dashboard
+  map (including `PHARMACIST` and unknown roles) and `formatDoctorName`
+  (with and without an existing title, `Dr`/`dr`/repeated titles, a name
+  like "Drake", and a missing doctor), and for `formatDate` /
+  `formatDateTime` (day before month, leading zeros, 24-hour time, ISO
+  strings, missing/invalid dates).
 
 ---
 

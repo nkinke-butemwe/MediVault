@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/src/hooks/useAuth'
+import { useHashSection } from '@/src/hooks/useHashSection'
 import toast from 'react-hot-toast'
 import type { Visit } from '@/src/types'
 import {
@@ -51,6 +52,9 @@ interface VerificationResult {
   } | null
 }
 
+// Sections this page can show. Must match the #hash values used in the sidebar.
+const RECEPTIONIST_SECTIONS = ['verify', 'visits', 'register'] as const
+
 export default function ReceptionistDashboard() {
   const { user } = useAuth()
 
@@ -69,7 +73,8 @@ export default function ReceptionistDashboard() {
   const [visitsLoading, setVisitsLoading] = useState(true)
 
   // Active section tabs
-  const [activeSection, setActiveSection] = useState<'verify' | 'visits' | 'register'>('verify')
+  // The section comes from the URL hash so the sidebar links work
+  const [activeSection, setActiveSection] = useHashSection(RECEPTIONIST_SECTIONS, 'verify')
 
   // New patient registration state
   const [newPatient, setNewPatient] = useState({

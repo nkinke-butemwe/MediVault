@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/src/hooks/useAuth'
+import { useHashSection } from '@/src/hooks/useHashSection'
 import toast from 'react-hot-toast'
 import type { MedicalRecord, Visit, Medication } from '@/src/types'
 import {
@@ -15,6 +16,7 @@ import {
   CloseIcon,
   SaveIcon,
 } from '@/src/components/icons'
+import { formatDate } from '@/src/lib/format'
 
 interface PatientSearchResult {
   id: string
@@ -40,6 +42,9 @@ function VisitStatusBadge({ status }: { status: string }) {
   )
 }
 
+// Sections this page can show. Must match the #hash values used in the sidebar.
+const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe'] as const
+
 export default function DoctorDashboard() {
   const { user } = useAuth()
 
@@ -50,7 +55,12 @@ export default function DoctorDashboard() {
   const [patientRecords, setPatientRecords] = useState<MedicalRecord[]>([])
   const [patientVisits, setPatientVisits] = useState<Visit[]>([])
   const [loadingPatientData, setLoadingPatientData] = useState(false)
-  const [activeSection, setActiveSection] = useState<'search' | 'add-record' | 'prescribe'>('search')
+  // The section the URL hash asks for (the sidebar links set this)
+  const [requestedSection, setActiveSection] = useHashSection(DOCTOR_SECTIONS, 'search')
+  // "Add record" and "Prescribe" only make sense once a patient is selected,
+  // so without a patient we always fall back to showing the search section.
+  const activeSection = !selectedPatient ? 'search' : requestedSection
+  const needsPatientFirst = !selectedPatient && requestedSection !== 'search'
   const [newRecord, setNewRecord] = useState({ diagnosis: '', allergies: '', notes: '', followUpDate: '' })
   const [medications, setMedications] = useState<Medication[]>([{ name: '', dose: '', duration: '' }])
   const [savingRecord, setSavingRecord] = useState(false)
@@ -204,6 +214,12 @@ export default function DoctorDashboard() {
       {/* Patient Search */}
       {activeSection === 'search' && (
         <div className="space-y-4">
+          {/* Shown when the sidebar asked for a section that needs a patient */}
+          {needsPatientFirst && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl px-4 py-3 text-sm">
+              Please search for and select a patient first, then choose this section.
+            </div>
+          )}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <h2 className="text-base font-semibold text-[#0f3b5c] mb-3">Search Patients</h2>
             <div className="relative">
@@ -248,7 +264,7 @@ export default function DoctorDashboard() {
                   </button>
                   <button onClick={() => setActiveSection('prescribe')}
                     className="bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-600 transition-all">
-                    💊 Prescribe
+                    Prescribe
                   </button>
                 </div>
               </div>
@@ -271,7 +287,7 @@ export default function DoctorDashboard() {
                           <div key={record.id} className="p-5">
                             <div className="flex justify-between items-start mb-2">
                               <h4 className="font-semibold text-slate-800">{record.diagnosis}</h4>
-                              <span className="text-xs text-slate-400">{new Date(record.visitDate).toLocaleDateString()}</span>
+                              <span className="text-xs text-slate-400">{formatDate(record.visitDate)}</span>
                             </div>
                             {record.allergies && (
                               <p className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg inline-flex items-center gap-1.5 mb-2">
@@ -292,7 +308,7 @@ export default function DoctorDashboard() {
                             )}
                             {record.followUpDate && (
                               <p className="text-xs text-blue-600 mt-2 inline-flex items-center gap-1.5">
-                                <CalendarIcon size={13} /> Follow-up: {new Date(record.followUpDate).toLocaleDateString()}
+                                <CalendarIcon size={13} /> Follow-up: {formatDate(record.followUpDate)}
                               </p>
                             )}
                           </div>
@@ -314,7 +330,7 @@ export default function DoctorDashboard() {
                             <div>
                               <p className="font-medium text-slate-800">{visit.reason}</p>
                               <p className="text-sm text-slate-500 mt-0.5">
-                                {new Date(visit.visitDate).toLocaleDateString()}
+                                {formatDate(visit.visitDate)}
                                 {visit.vitals && ` · ${visit.vitals}`}
                               </p>
                               {visit.doctorNotes && <p className="text-xs text-slate-400 mt-1 italic">{visit.doctorNotes}</p>}
@@ -433,7 +449,7 @@ export default function DoctorDashboard() {
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <div className="flex justify-between items-center mb-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#0f3b5c]">💊 Send Prescription to Pharmacy</h2>
+              <h2 className="text-lg font-semibold text-[#0f3b5c]">Send Prescription to Pharmacy</h2>
               <p className="text-sm text-slate-500">Patient: <strong>{selectedPatient.fullName}</strong></p>
             </div>
             <button onClick={() => setActiveSection('search')}
@@ -495,7 +511,7 @@ export default function DoctorDashboard() {
             <div className="flex gap-3 pt-2">
               <button onClick={handleSendPrescription} disabled={sendingPrescription}
                 className="bg-green-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700 transition-all disabled:opacity-60 inline-flex items-center gap-2">
-                {sendingPrescription ? 'Sending...' : '💊 Send to Pharmacy'}
+                {sendingPrescription ? 'Sending...' : 'Send to Pharmacy'}
               </button>
               <button onClick={() => setActiveSection('search')}
                 className="bg-slate-100 text-slate-600 px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-all">

@@ -18,8 +18,10 @@ dist/
 # generated/prisma/
 
 # Logs
+# ("/logs/" only matches a folder at the project root. A bare "logs/" would
+# also ignore src/app/dashboard/admin/logs/, which is a real page.)
 *.log
-logs/
+/logs/
 
 # OS files
 .DS_Store

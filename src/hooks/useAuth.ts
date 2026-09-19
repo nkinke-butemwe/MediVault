@@ -6,19 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { AuthUser, Role } from '@/src/types'
-
-// Returns the correct dashboard path for each role
-function getDashboardPath(role: Role): string {
-  const dashboards: Record<Role, string> = {
-    PATIENT: '/dashboard/patient',
-    RECEPTIONIST: '/dashboard/receptionist',
-    DOCTOR: '/dashboard/doctor',
-    ADMIN: '/dashboard/admin',
-    NEXT_OF_KIN: '/dashboard/next-of-kin',
-  }
-  return dashboards[role] || '/login'
-}
+import type { AuthUser } from '@/src/types'
+import { getDashboardPath } from '@/src/lib/roles'
 
 export function useAuth() {
   const router = useRouter()

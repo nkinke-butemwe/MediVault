@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { useHashSection } from '@/src/hooks/useHashSection'
+import { formatDate, formatDateTime } from '@/src/lib/format'
 
 interface Medication { name: string; dose: string; duration: string; quantity?: number }
 interface Prescription {
@@ -32,8 +34,12 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: 'bg-red-100 text-red-700 border-red-200',
 }
 
+// Sections this page can show. Must match the #hash values used in the sidebar.
+const PHARMACY_SECTIONS = ['prescriptions', 'inventory'] as const
+
 export default function PharmacyDashboard() {
-  const [tab, setTab] = useState<'prescriptions' | 'inventory'>('prescriptions')
+  // The tab comes from the URL hash so the sidebar links work
+  const [tab, setTab] = useHashSection(PHARMACY_SECTIONS, 'prescriptions')
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [inventory, setInventory] = useState<DrugItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -124,7 +130,7 @@ export default function PharmacyDashboard() {
         {(['prescriptions', 'inventory'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all capitalize ${tab === t ? 'bg-[#0f3b5c] text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}>
-            {t === 'prescriptions' ? ' Prescriptions' : ' Drug Inventory'}
+            {t === 'prescriptions' ? 'Prescriptions' : 'Drug Inventory'}
           </button>
         ))}
       </div>
@@ -160,7 +166,7 @@ export default function PharmacyDashboard() {
                         <span className={`px-3 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[rx.status]}`}>{rx.status}</span>
                       </div>
                       <p className="text-slate-400 text-sm">Student: {rx.patient.studentNumber || 'N/A'} · Prescribed by {rx.doctor.fullName}</p>
-                      <p className="text-slate-400 text-xs mt-1">{new Date(rx.createdAt).toLocaleString()}</p>
+                      <p className="text-slate-400 text-xs mt-1">{formatDateTime(rx.createdAt)}</p>
                     </div>
                     {rx.status === 'PENDING' && (
                       <button
@@ -168,13 +174,13 @@ export default function PharmacyDashboard() {
                         disabled={dispensing === rx.id}
                         className="bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-green-700 transition-all disabled:opacity-60"
                       >
-                        {dispensing === rx.id ? 'Dispensing...' : '✓ Mark Dispensed'}
+                        {dispensing === rx.id ? 'Dispensing...' : 'Mark Dispensed'}
                       </button>
                     )}
                     {rx.status === 'DISPENSED' && (
                       <div className="text-right">
                         <p className="text-green-600 text-sm font-semibold">Dispensed</p>
-                        <p className="text-slate-400 text-xs">{rx.dispensedAt ? new Date(rx.dispensedAt).toLocaleString() : ''}</p>
+                        <p className="text-slate-400 text-xs">{rx.dispensedAt ? formatDateTime(rx.dispensedAt) : ''}</p>
                         {rx.pharmacist && <p className="text-slate-400 text-xs">by {rx.pharmacist.fullName}</p>}
                       </div>
                     )}
@@ -303,7 +309,7 @@ export default function PharmacyDashboard() {
                         </td>
                         <td className="px-4 py-3 text-slate-500">{drug.unit}</td>
                         <td className="px-4 py-3 text-slate-500">
-                          {drug.expiryDate ? new Date(drug.expiryDate).toLocaleDateString() : '—'}
+                          {drug.expiryDate ? formatDate(drug.expiryDate) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           {isExpired ? (

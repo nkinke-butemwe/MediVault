@@ -15,6 +15,7 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
 } from '@/src/components/icons'
+import { formatDate } from '@/src/lib/format'
 
 export default function NextOfKinDashboard() {
   const { user } = useAuth()
@@ -119,7 +120,7 @@ export default function NextOfKinDashboard() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div id="patients" className="space-y-4">
           {/* Your User ID for sharing */}
           <div className="bg-[#e6f0f9] rounded-2xl p-4 flex items-center gap-3">
             <InfoIcon size={22} className="text-[#0f3b5c] flex-shrink-0" />
@@ -143,7 +144,7 @@ export default function NextOfKinDashboard() {
                     <p className="font-semibold text-slate-800">{assignment.patient.fullName}</p>
                     <p className="text-sm text-slate-500">{assignment.patient.email}</p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Assigned: {new Date(assignment.delegatedAt).toLocaleDateString()}
+                      Assigned: {formatDate(assignment.delegatedAt)}
                     </p>
                   </div>
                 </div>
@@ -168,7 +169,7 @@ export default function NextOfKinDashboard() {
                       </p>
                       {assignment.consentGivenAt && (
                         <p className="text-xs text-slate-400">
-                          {new Date(assignment.consentGivenAt).toLocaleDateString()}
+                          {formatDate(assignment.consentGivenAt)}
                         </p>
                       )}
                     </div>
@@ -223,7 +224,7 @@ export default function NextOfKinDashboard() {
                           <div>
                             <p className="text-sm font-medium text-slate-700">{visit.reason}</p>
                             <p className="text-xs text-slate-400 mt-0.5">
-                              {new Date(visit.visitDate).toLocaleDateString()}
+                              {formatDate(visit.visitDate)}
                             </p>
                           </div>
                           <span className={`text-xs font-semibold px-2 py-1 rounded-full ${

@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ComponentType } from 'react'
 import { useAuth } from '@/src/hooks/useAuth'
+import { useHashSection } from '@/src/hooks/useHashSection'
+import { formatDate, formatDateTime, formatDoctorName } from '@/src/lib/format'
 import toast from 'react-hot-toast'
 import type { MedicalRecord, Visit, NextOfKinAssignment, AccessLog, Medication } from '@/src/types'
 import {
@@ -74,6 +76,9 @@ function VisitStatusBadge({ status }: { status: string }) {
   )
 }
 
+// Sections this page can show. Must match the #hash values used in the sidebar.
+const PATIENT_SECTIONS = ['overview', 'records', 'visits', 'kin', 'logs'] as const
+
 export default function PatientDashboard() {
   const { user, loading: authLoading } = useAuth()
 
@@ -89,7 +94,8 @@ export default function PatientDashboard() {
   const [assigningKin, setAssigningKin] = useState(false)
 
   // Active section for tab navigation
-  const [activeSection, setActiveSection] = useState<'overview' | 'records' | 'visits' | 'kin' | 'logs'>('overview')
+  // The section comes from the URL hash so the sidebar links work
+  const [activeSection, setActiveSection] = useHashSection(PATIENT_SECTIONS, 'overview')
 
   // Fetch all data for this patient
   const fetchData = useCallback(async () => {
@@ -203,13 +209,13 @@ export default function PatientDashboard() {
                   <div>
                     <p className="font-semibold text-slate-800">{records[0].diagnosis}</p>
                     <p className="text-sm text-slate-500 mt-1">
-                      Dr. {records[0].doctor?.fullName} · {new Date(records[0].visitDate).toLocaleDateString()}
+                      {formatDoctorName(records[0].doctor?.fullName)} · {formatDate(records[0].visitDate)}
                     </p>
                   </div>
                   {records[0].followUpDate && (
                     <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full inline-flex items-center gap-1.5">
                       <CalendarIcon size={13} />
-                      Follow-up: {new Date(records[0].followUpDate).toLocaleDateString()}
+                      Follow-up: {formatDate(records[0].followUpDate)}
                     </span>
                   )}
                 </div>
@@ -241,9 +247,9 @@ export default function PatientDashboard() {
                 <div key={record.id} className="p-6 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-semibold text-slate-800">{record.diagnosis}</h3>
-                    <span className="text-xs text-slate-400">{new Date(record.visitDate).toLocaleDateString()}</span>
+                    <span className="text-xs text-slate-400">{formatDate(record.visitDate)}</span>
                   </div>
-                  <p className="text-sm text-slate-500 mb-3">Dr. {record.doctor?.fullName}</p>
+                  <p className="text-sm text-slate-500 mb-3">{formatDoctorName(record.doctor?.fullName)}</p>
                   {record.allergies && (
                     <p className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg inline-flex items-center gap-1.5 mb-2">
                       <AlertTriangleIcon size={13} />
@@ -269,7 +275,7 @@ export default function PatientDashboard() {
                   {record.followUpDate && (
                     <p className="text-xs text-blue-600 mt-2 flex items-center gap-1.5">
                       <CalendarIcon size={13} />
-                      Follow-up: {new Date(record.followUpDate).toLocaleDateString()}
+                      Follow-up: {formatDate(record.followUpDate)}
                     </p>
                   )}
                 </div>
@@ -293,7 +299,7 @@ export default function PatientDashboard() {
                     <div>
                       <p className="font-medium text-slate-800">{visit.reason}</p>
                       <p className="text-sm text-slate-500 mt-1">
-                        {new Date(visit.visitDate).toLocaleDateString()} · {visit.vitals || 'Vitals not recorded'}
+                        {formatDate(visit.visitDate)} · {visit.vitals || 'Vitals not recorded'}
                       </p>
                     </div>
                     <VisitStatusBadge status={visit.status} />
@@ -316,7 +322,7 @@ export default function PatientDashboard() {
                     <div>
                       <p className="font-medium text-slate-800">{visit.reason}</p>
                       <p className="text-sm text-slate-500 mt-1">
-                        {new Date(visit.visitDate).toLocaleDateString()} · {visit.vitals || 'N/A'}
+                        {formatDate(visit.visitDate)} · {visit.vitals || 'N/A'}
                       </p>
                       {visit.doctorNotes && (
                         <p className="text-xs text-slate-400 mt-1 italic">{visit.doctorNotes}</p>
@@ -363,7 +369,7 @@ export default function PatientDashboard() {
                       )}
                       {assignment.consentGivenAt && (
                         <p className="text-xs text-slate-400 mt-1">
-                          {new Date(assignment.consentGivenAt).toLocaleDateString()}
+                          {formatDate(assignment.consentGivenAt)}
                         </p>
                       )}
                     </div>
@@ -422,7 +428,7 @@ export default function PatientDashboard() {
                     </p>
                   </div>
                   <span className="text-xs text-slate-400">
-                    {new Date(log.timestamp).toLocaleString()}
+                    {formatDateTime(log.timestamp)}
                   </span>
                 </div>
               ))}

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import type { Role } from '@/src/types'
+import { getDashboardPath } from '@/src/lib/roles'
 import {
   ShieldIcon,
   ShieldCheckIcon,
@@ -18,13 +19,6 @@ import {
   ArrowLeftIcon,
 } from '@/src/components/icons'
 
-const ROLE_DASHBOARDS: Record<string, string> = {
-  PATIENT: '/dashboard/patient',
-  RECEPTIONIST: '/dashboard/receptionist',
-  DOCTOR: '/dashboard/doctor',
-  ADMIN: '/dashboard/admin',
-  NEXT_OF_KIN: '/dashboard/next-of-kin',
-}
 
 const features = [
   { icon: ShieldCheckIcon, color: '#eeedfe', iconColor: '#534AB7', label: 'Student number verification — no physical ID required' },
@@ -48,7 +42,7 @@ export default function LoginPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.data) {
-          router.push(ROLE_DASHBOARDS[data.data.role] || '/dashboard/patient')
+          router.push(getDashboardPath(data.data.role))
         }
       })
       .catch(() => {})
@@ -75,7 +69,7 @@ export default function LoginPage() {
 
       if (data.success) {
         toast.success(`Welcome back, ${data.data.fullName}!`)
-        router.push(ROLE_DASHBOARDS[data.data.role] || '/dashboard/patient')
+        router.push(getDashboardPath(data.data.role))
       } else {
         toast.error(data.error || 'Login failed. Please try again.')
       }

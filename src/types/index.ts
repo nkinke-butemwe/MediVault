@@ -3,7 +3,7 @@
 
 // ─── Enums (mirror Prisma enums for frontend use) ──────────────────────────
 
-export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN' | 'NEXT_OF_KIN'
+export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN' | 'NEXT_OF_KIN' | 'PHARMACIST'
 export type VisitStatus = 'WAITING' | 'CHECKED_IN' | 'IN_CONSULTATION' | 'CHECKED_OUT' | 'CANCELLED'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
