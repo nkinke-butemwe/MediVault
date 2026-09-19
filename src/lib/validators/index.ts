@@ -10,7 +10,7 @@ export const LoginSchema = z.object({
   // identifier can be either an email address or a student number
   identifier: z.string().min(1, 'Email or student number is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['PATIENT', 'RECEPTIONIST', 'DOCTOR', 'ADMIN', 'NEXT_OF_KIN'], {
+  role: z.enum(['PATIENT', 'RECEPTIONIST', 'DOCTOR', 'ADMIN', 'NEXT_OF_KIN', 'PHARMACIST'], {
     errorMap: () => ({ message: 'Please select a valid role' }),
   }),
 })

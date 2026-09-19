@@ -13,7 +13,7 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 async function main() {
-  console.log('🌱 Seeding MediVault database...')
+  console.log(' Seeding MediVault database...')
 
   const passwordHas = await hashPassword('password123')
 
@@ -30,7 +30,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ Created admin:', admin.email)
+  console.log(' Created admin:', admin.email)
 
   // ─── Receptionist ────────────────────────────────────────────────────────
   const receptionist = await prisma.user.upsert({
@@ -45,7 +45,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ Created receptionist:', receptionist.email)
+  console.log(' Created receptionist:', receptionist.email)
 
   // ─── Doctors ─────────────────────────────────────────────────────────────
   const doctor1 = await prisma.user.upsert({
@@ -73,7 +73,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ Created doctors:', doctor1.email, doctor2.email)
+  console.log(' Created doctors:', doctor1.email, doctor2.email)
 
   // ─── Next of Kin ─────────────────────────────────────────────────────────
   const nextOfKin = await prisma.user.upsert({
@@ -88,7 +88,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ Created next of kin:', nextOfKin.email)
+  console.log(' Created next of kin:', nextOfKin.email)
 
   // ─── Patients ─────────────────────────────────────────────────────────────
   const patient1 = await prisma.user.upsert({
@@ -129,14 +129,14 @@ async function main() {
         create: {
           dateOfBirth: new Date('2001-07-22'),
           bloodType: 'A+',
-          emergencyContactName: 'John Ngandu',
+          emergencyContactName: 'Mary Chanda',
           emergencyContactPhone: '+260977000008',
           address: 'Woodlands, Lusaka',
         },
       },
     },
   })
-  console.log('✅ Created patients:', patient1.email, patient2.email)
+  console.log(' Created patients:', patient1.email, patient2.email)
 
   // ─── Next of Kin Assignment ───────────────────────────────────────────────
   await prisma.nextOfKinAssignment.upsert({
@@ -151,7 +151,7 @@ async function main() {
       consentGivenAt: new Date(),
     },
   })
-  console.log('✅ Created next of kin assignment')
+  console.log(' Created next of kin assignment')
 
   // ─── Sample Medical Records ───────────────────────────────────────────────
   await prisma.medicalRecord.createMany({
@@ -196,7 +196,7 @@ async function main() {
       },
     ],
   })
-  console.log('✅ Created sample medical records')
+  console.log(' Created sample medical records')
 
   // ─── Sample Visits ────────────────────────────────────────────────────────
   await prisma.visit.createMany({
@@ -239,7 +239,7 @@ async function main() {
       },
     ],
   })
-  console.log('✅ Created sample visits')
+  console.log(' Created sample visits')
 
   // ─── Sample Access Logs ───────────────────────────────────────────────────
   await prisma.accessLog.createMany({
@@ -274,7 +274,7 @@ async function main() {
       },
     ],
   })
-  console.log('✅ Created sample access logs')
+  console.log(' Created sample access logs')
 
   console.log('\n🎉 Seeding complete!')
   console.log('\nDemo login credentials (all passwords: password123):')

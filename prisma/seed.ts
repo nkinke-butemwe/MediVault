@@ -89,6 +89,20 @@ async function main() {
   })
   console.log('✅ Created next of kin:', nextOfKin.email)
 
+  const pharmacist = await prisma.user.upsert({
+  where: { email: 'pharmacist@unza.zm' },
+  update: {},
+  create: {
+    email: 'pharmacist@unza.zm',
+    passwordHash,
+    role: Role.PHARMACIST,
+    fullName: 'Thandiwe Mwila',
+    phone: '+260977000015',
+    isActive: true,
+  },
+})
+console.log('✅ Created pharmacist:', pharmacist.email)
+
   // ─── Patients ─────────────────────────────────────────────────────────────
   const patient1 = await prisma.user.upsert({
     where: { email: 'butemwe.nkinke@students.unza.zm' },

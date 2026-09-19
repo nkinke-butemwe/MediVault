@@ -262,6 +262,7 @@ export default function LoginPage() {
                   <option value="DOCTOR">Doctor</option>
                   <option value="ADMIN">Administrator</option>
                   <option value="NEXT_OF_KIN">Next of Kin</option>
+                  <option value="PHARMACIST">Pharmacist</option>
                 </select>
               </div>
 
