@@ -5,25 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
-
-function getRoleAndActor(request: NextRequest) {
-  let role = request.headers.get('x-user-role')
-  let actorId = request.headers.get('x-user-id') ?? 'system'
-  if (!role) {
-    const token = request.cookies.get('medivault_token')?.value
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        role = payload.role
-        actorId = payload.userId ?? 'system'
-      } catch {}
-    }
-  }
-  return { role, actorId }
-}
+import { CreatePrescriptionSchema } from '@/src/lib/validators'
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
   const { searchParams } = new URL(request.url)
   const statusFilter = searchParams.get('status')
   const patientId = searchParams.get('patientId')
@@ -60,18 +46,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
 
   if (!['DOCTOR', 'ADMIN'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Only doctors can create prescriptions' }, { status: 403 })
   }
 
-  const body = await request.json()
-  const { patientId, medications, medicalRecordId, notes } = body
-
-  if (!patientId || !medications || !Array.isArray(medications) || medications.length === 0) {
-    return NextResponse.json({ success: false, error: 'patientId and at least one medication are required' }, { status: 400 })
+  const validation = CreatePrescriptionSchema.safeParse(await request.json())
+  if (!validation.success) {
+    const first = validation.error.issues[0]
+    return NextResponse.json(
+      { success: false, error: first?.message ?? 'Invalid prescription', details: validation.error.flatten() },
+      { status: 400 }
+    )
   }
+  const { patientId, medications, medicalRecordId, notes } = validation.data
 
   const patient = await prisma.user.findFirst({ where: { id: patientId, role: 'PATIENT' } })
   if (!patient) return NextResponse.json({ success: false, error: 'Patient not found' }, { status: 404 })

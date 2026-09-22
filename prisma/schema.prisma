@@ -19,6 +19,7 @@ enum Role {
   ADMIN
   NEXT_OF_KIN
   PHARMACIST
+  LAB_TECHNICIAN
 }
 
 enum VisitStatus {
@@ -33,6 +34,29 @@ enum PrescriptionStatus {
   PENDING
   DISPENSED
   CANCELLED
+}
+
+// Lab: ORDERED (doctor asked) -> COLLECTED (sample taken) -> COMPLETED (all results in)
+enum LabOrderStatus {
+  ORDERED
+  COLLECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum LabPriority {
+  ROUTINE
+  URGENT
+}
+
+// How a single result compares with its reference range
+enum LabFlag {
+  NORMAL
+  LOW
+  HIGH
+  CRITICAL_LOW
+  CRITICAL_HIGH
+  ABNORMAL
 }
 
 // ─── Models ────────────────────────────────────────────────────────────────
@@ -50,23 +74,29 @@ model User {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  patientProfile      PatientProfile?
-  recordsCreated      MedicalRecord[]       @relation("DoctorNotes")
-  patientRecords      MedicalRecord[]       @relation("PatientRecords")
-  visitsCreated       Visit[]               @relation("CreatedBy")
-  patientVisits       Visit[]               @relation("PatientVisits")
-  accessLogs          AccessLog[]           @relation("AccessedBy")
-  accessLogsAbout     AccessLog[]           @relation("TargetPatient")
-  kinAssignments      NextOfKinAssignment[] @relation("Patient")
-  kinFor              NextOfKinAssignment[] @relation("NextOfKin")
+  patientProfile       PatientProfile?
+  recordsCreated       MedicalRecord[]       @relation("DoctorNotes")
+  patientRecords       MedicalRecord[]       @relation("PatientRecords")
+  visitsCreated        Visit[]               @relation("CreatedBy")
+  patientVisits        Visit[]               @relation("PatientVisits")
+  accessLogs           AccessLog[]           @relation("AccessedBy")
+  accessLogsAbout      AccessLog[]           @relation("TargetPatient")
+  kinAssignments       NextOfKinAssignment[] @relation("Patient")
+  kinFor               NextOfKinAssignment[] @relation("NextOfKin")
   // Prescriptions created by this user (as doctor)
-  prescriptionsIssued Prescription[]        @relation("PrescriptionDoctor")
+  prescriptionsIssued  Prescription[]        @relation("PrescriptionDoctor")
   // Prescriptions dispensed by this user (as pharmacist)
-  prescriptionsFilled Prescription[]        @relation("PrescriptionPharmacist")
+  prescriptionsFilled  Prescription[]        @relation("PrescriptionPharmacist")
   // Prescriptions belonging to this user (as patient)
-  patientPrescriptions Prescription[]       @relation("PrescriptionPatient")
+  patientPrescriptions Prescription[]        @relation("PrescriptionPatient")
   // Drug inventory updates made by this user
-  drugUpdates         DrugInventory[]       @relation("DrugUpdatedBy")
+  drugUpdates          DrugInventory[]       @relation("DrugUpdatedBy")
+  // Lab orders: belonging to this user (as patient), and each step of the lab workflow
+  labOrdersAsPatient   LabOrder[]            @relation("LabOrderPatient")
+  labOrdersPlaced      LabOrder[]            @relation("LabOrderOrderedBy")
+  labOrdersCollected   LabOrder[]            @relation("LabOrderCollectedBy")
+  labOrdersCompleted   LabOrder[]            @relation("LabOrderCompletedBy")
+  labOrdersReviewed    LabOrder[]            @relation("LabOrderReviewedBy")
 }
 
 model PatientProfile {
@@ -80,19 +110,19 @@ model PatientProfile {
 }
 
 model MedicalRecord {
-  id           String         @id @default(cuid())
-  patientId    String
-  patient      User           @relation("PatientRecords", fields: [patientId], references: [id])
-  doctorId     String
-  doctor       User           @relation("DoctorNotes", fields: [doctorId], references: [id])
-  diagnosis    String
-  medications  String?
-  allergies    String?
-  notes        String?
-  visitDate    DateTime       @default(now())
-  followUpDate DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  patientId     String
+  patient       User           @relation("PatientRecords", fields: [patientId], references: [id])
+  doctorId      String
+  doctor        User           @relation("DoctorNotes", fields: [doctorId], references: [id])
+  diagnosis     String
+  medications   String?
+  allergies     String?
+  notes         String?
+  visitDate     DateTime       @default(now())
+  followUpDate  DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   // Prescriptions linked to this record
   prescriptions Prescription[]
 }
@@ -138,18 +168,18 @@ model Prescription {
 }
 
 model DrugInventory {
-  id            String    @id @default(cuid())
-  drugName      String
-  genericName   String?
-  quantity      Int       @default(0)
-  unit          String    // e.g. "tablets", "ml", "capsules"
-  expiryDate    DateTime?
-  reorderLevel  Int       @default(10)
+  id           String    @id @default(cuid())
+  drugName     String
+  genericName  String?
+  quantity     Int       @default(0)
+  unit         String // e.g. "tablets", "ml", "capsules"
+  expiryDate   DateTime?
+  reorderLevel Int       @default(10)
   // The pharmacist/admin who last updated this entry
-  updatedById   String?
-  updatedBy     User?     @relation("DrugUpdatedBy", fields: [updatedById], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  updatedById  String?
+  updatedBy    User?     @relation("DrugUpdatedBy", fields: [updatedById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // ─── Existing Models ────────────────────────────────────────────────────────
@@ -180,4 +210,81 @@ model AccessLog {
   ipAddress        String?
   userAgent        String?
   timestamp        DateTime @default(now())
+}
+
+// ─── Laboratory ────────────────────────────────────────────────────────────
+
+// The list of tests the clinic lab can run, with their normal ranges.
+model LabTest {
+  id             String   @id @default(cuid())
+  code           String   @unique // short code, e.g. "HB"
+  name           String // e.g. "Haemoglobin"
+  category       String // e.g. "Haematology"
+  unit           String? // e.g. "g/dL" (numeric tests)
+  refLow         Float? // normal range, low end
+  refHigh        Float? // normal range, high end
+  criticalLow    Float? // below this needs urgent action
+  criticalHigh   Float? // above this needs urgent action
+  normalText     String? // for yes/no style tests: the normal answer, e.g. "Negative"
+  allowedResults String? // for those tests: comma-separated choices, e.g. "Negative,Positive"
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orderItems LabOrderItem[]
+}
+
+// A doctor's request for one or more tests for a patient.
+model LabOrder {
+  id            String         @id @default(cuid())
+  patientId     String
+  orderedById   String
+  priority      LabPriority    @default(ROUTINE)
+  status        LabOrderStatus @default(ORDERED)
+  clinicalNotes String?
+  collectedAt   DateTime?
+  collectedById String?
+  completedAt   DateTime?
+  completedById String?
+  // The patient only sees results after the ordering doctor has reviewed them
+  reviewedAt    DateTime?
+  reviewedById  String?
+  doctorComment String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  patient     User           @relation("LabOrderPatient", fields: [patientId], references: [id])
+  orderedBy   User           @relation("LabOrderOrderedBy", fields: [orderedById], references: [id])
+  collectedBy User?          @relation("LabOrderCollectedBy", fields: [collectedById], references: [id])
+  completedBy User?          @relation("LabOrderCompletedBy", fields: [completedById], references: [id])
+  reviewedBy  User?          @relation("LabOrderReviewedBy", fields: [reviewedById], references: [id])
+  items       LabOrderItem[]
+
+  @@index([patientId])
+  @@index([status])
+}
+
+// One test inside an order, and (once the lab has run it) its result.
+// The unit and ranges are COPIED from the test when the order is placed, so
+// changing the catalogue later never rewrites the meaning of an old result.
+model LabOrderItem {
+  id           String    @id @default(cuid())
+  orderId      String
+  testId       String
+  unit         String?
+  refLow       Float?
+  refHigh      Float?
+  criticalLow  Float?
+  criticalHigh Float?
+  normalText   String?
+  valueNumeric Float?
+  valueText    String?
+  flag         LabFlag?
+  notes        String?
+  resultAt     DateTime?
+
+  order LabOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  test  LabTest  @relation(fields: [testId], references: [id])
+
+  @@unique([orderId, testId])
 }

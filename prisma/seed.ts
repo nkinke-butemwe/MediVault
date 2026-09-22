@@ -2,7 +2,8 @@
 // Seeds the database with demo users for each role.
 // All demo passwords are: password123
 
-import { PrismaClient, Role, VisitStatus } from '@prisma/client'
+import { PrismaClient, Role, VisitStatus, LabFlag, LabOrderStatus, LabPriority } from '@prisma/client'
+import { computeFlag } from '../src/lib/lab'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -102,6 +103,20 @@ async function main() {
   },
 })
 console.log('✅ Created pharmacist:', pharmacist.email)
+
+  const labTech = await prisma.user.upsert({
+    where: { email: 'lab@unza.zm' },
+    update: {},
+    create: {
+      email: 'lab@unza.zm',
+      passwordHash,
+      role: Role.LAB_TECHNICIAN,
+      fullName: 'Chipo Zulu',
+      phone: '+260977000016',
+      isActive: true,
+    },
+  })
+  console.log('✅ Created lab technician:', labTech.email)
 
   // ─── Patients ─────────────────────────────────────────────────────────────
   const patient1 = await prisma.user.upsert({
@@ -424,6 +439,102 @@ console.log('✅ Created pharmacist:', pharmacist.email)
   })
   console.log('✅ Created sample access logs')
 
+  // ─── Pharmacy stock (only if the inventory is empty) ─────────────────────
+  // Dispensing a prescription now takes stock out of the inventory, so the demo
+  // needs some drugs on the shelf.
+  if ((await prisma.drugInventory.count()) === 0) {
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 1)
+    await prisma.drugInventory.createMany({
+      data: [
+        { drugName: 'Paracetamol', genericName: 'Acetaminophen', quantity: 500, unit: 'tablets', reorderLevel: 100, expiryDate: nextYear, updatedById: pharmacist.id },
+        { drugName: 'Amoxicillin', genericName: 'Amoxicillin trihydrate', quantity: 300, unit: 'capsules', reorderLevel: 60, expiryDate: nextYear, updatedById: pharmacist.id },
+        { drugName: 'Ibuprofen', genericName: null, quantity: 200, unit: 'tablets', reorderLevel: 50, expiryDate: nextYear, updatedById: pharmacist.id },
+        { drugName: 'Coartem', genericName: 'Artemether/Lumefantrine', quantity: 120, unit: 'tablets', reorderLevel: 40, expiryDate: nextYear, updatedById: pharmacist.id },
+        { drugName: 'ORS', genericName: 'Oral rehydration salts', quantity: 8, unit: 'sachets', reorderLevel: 20, expiryDate: nextYear, updatedById: pharmacist.id },
+      ],
+    })
+    console.log('✅ Created sample pharmacy stock')
+  }
+
+  // ─── Lab test catalogue ──────────────────────────────────────────────────
+  // Adult reference ranges, simplified for a demo. A real clinic would use the
+  // ranges printed by its own analyser or reagent supplier.
+  const labTests = [
+    { code: 'HB', name: 'Haemoglobin', category: 'Haematology', unit: 'g/dL', refLow: 12, refHigh: 17.5, criticalLow: 7, criticalHigh: 20 },
+    { code: 'WBC', name: 'White Blood Cell Count', category: 'Haematology', unit: 'x10⁹/L', refLow: 4, refHigh: 11, criticalLow: 2, criticalHigh: 30 },
+    { code: 'PLT', name: 'Platelet Count', category: 'Haematology', unit: 'x10⁹/L', refLow: 150, refHigh: 400, criticalLow: 20, criticalHigh: 1000 },
+    { code: 'FBG', name: 'Fasting Blood Glucose', category: 'Biochemistry', unit: 'mmol/L', refLow: 3.9, refHigh: 5.6, criticalLow: 2.8, criticalHigh: 22 },
+    { code: 'CREA', name: 'Creatinine', category: 'Biochemistry', unit: 'µmol/L', refLow: 60, refHigh: 110, criticalLow: null, criticalHigh: 500 },
+    { code: 'ALT', name: 'Alanine Aminotransferase (ALT)', category: 'Biochemistry', unit: 'U/L', refLow: 7, refHigh: 56, criticalLow: null, criticalHigh: 1000 },
+    { code: 'MRDT', name: 'Malaria Rapid Test (RDT)', category: 'Parasitology', normalText: 'Negative', allowedResults: 'Negative,Positive' },
+    { code: 'UPRO', name: 'Urine Protein (dipstick)', category: 'Urinalysis', normalText: 'Negative', allowedResults: 'Negative,Trace,1+,2+,3+' },
+  ]
+  for (const t of labTests) {
+    await prisma.labTest.upsert({ where: { code: t.code }, update: {}, create: t })
+  }
+  console.log('✅ Created lab test catalogue:', labTests.length, 'tests')
+
+  // ─── Sample lab orders (only if there are none yet) ──────────────────────
+  if ((await prisma.labOrder.count()) === 0) {
+    const catalogue = await prisma.labTest.findMany()
+    const byCode = new Map(catalogue.map((t) => [t.code, t]))
+    const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000)
+
+    // Builds the order items, copying the reference ranges and computing flags
+    const buildItems = (rows: { code: string; value?: number; text?: string }[]) =>
+      rows.map((r) => {
+        const t = byCode.get(r.code)!
+        const ref = {
+          refLow: t.refLow, refHigh: t.refHigh,
+          criticalLow: t.criticalLow, criticalHigh: t.criticalHigh, normalText: t.normalText,
+        }
+        const hasResult = r.value !== undefined || r.text !== undefined
+        return {
+          testId: t.id, unit: t.unit, ...ref,
+          valueNumeric: r.value ?? null,
+          valueText: r.text ?? null,
+          flag: hasResult ? (computeFlag(ref, { valueNumeric: r.value, valueText: r.text }) as LabFlag | null) : null,
+          resultAt: hasResult ? daysAgo(1) : null,
+        }
+      })
+
+    // 1) Completed AND reviewed by the doctor — the patient can see this one
+    await prisma.labOrder.create({
+      data: {
+        patientId: patient1.id, orderedById: doctor1.id, priority: LabPriority.ROUTINE,
+        status: LabOrderStatus.COMPLETED, clinicalNotes: 'Fatigue and headaches for two weeks',
+        collectedAt: daysAgo(2), collectedById: labTech.id, completedAt: daysAgo(1), completedById: labTech.id,
+        reviewedAt: daysAgo(1), reviewedById: doctor1.id, doctorComment: 'Mild anaemia. Start iron supplements and recheck in 4 weeks.',
+        createdAt: daysAgo(3),
+        items: { create: buildItems([
+          { code: 'HB', value: 10.4 }, { code: 'WBC', value: 6.2 }, { code: 'PLT', value: 245 }, { code: 'MRDT', text: 'Negative' },
+        ]) },
+      },
+    })
+
+    // 2) Completed with a CRITICAL value, waiting for the doctor to review
+    await prisma.labOrder.create({
+      data: {
+        patientId: patient3.id, orderedById: doctor1.id, priority: LabPriority.URGENT,
+        status: LabOrderStatus.COMPLETED, clinicalNotes: 'Excessive thirst, frequent urination, dizziness',
+        collectedAt: daysAgo(1), collectedById: labTech.id, completedAt: daysAgo(0), completedById: labTech.id,
+        createdAt: daysAgo(1),
+        items: { create: buildItems([{ code: 'FBG', value: 24.3 }, { code: 'CREA', value: 88 }]) },
+      },
+    })
+
+    // 3) Just ordered — waiting in the lab queue
+    await prisma.labOrder.create({
+      data: {
+        patientId: patient2.id, orderedById: doctor2.id, priority: LabPriority.ROUTINE,
+        status: LabOrderStatus.ORDERED, clinicalNotes: 'Fever and chills since yesterday',
+        items: { create: buildItems([{ code: 'MRDT' }, { code: 'WBC' }]) },
+      },
+    })
+    console.log('✅ Created sample lab orders')
+  }
+
   console.log('\n🎉 Seeding complete!')
   console.log('\nDemo login credentials (all passwords: password123):')
   console.log('  Admin:        admin@unza.zm')
@@ -436,6 +547,8 @@ console.log('✅ Created pharmacist:', pharmacist.email)
   console.log('  Patient 4:    luyando.phiri@students.unza.zm     (student: 2023040215)')
   console.log('  Patient 5:    mwamba.sichone@students.unza.zm    (student: 2019031233)')
   console.log('  Next of Kin:  kin.chanda@gmail.com')
+  console.log('  Pharmacist:   pharmacist@unza.zm')
+  console.log('  Lab Tech:     lab@unza.zm')
 }
 
 main()

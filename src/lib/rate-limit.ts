@@ -53,7 +53,7 @@ export function checkRateLimit(key: string): {
 // In a real app, you might run this on a schedule (e.g., every hour).
 export function cleanupRateLimitStore(): void {
   const now = Date.now()
-  for (const [key, entry] of rateLimitStore.entries()) {
+  for (const [key, entry] of Array.from(rateLimitStore.entries())) {
     if (now > entry.resetAt) {
       rateLimitStore.delete(key)
     }

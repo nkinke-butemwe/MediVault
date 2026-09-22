@@ -3,9 +3,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-user-role')
+  const { role } = await getRoleAndActor(request)
 
   if (role !== 'ADMIN') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })

@@ -4,25 +4,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
-
-function getRoleAndActor(request: NextRequest) {
-  let role = request.headers.get('x-user-role')
-  let actorId = request.headers.get('x-user-id') ?? 'system'
-  if (!role) {
-    const token = request.cookies.get('medivault_token')?.value
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        role = payload.role
-        actorId = payload.userId ?? 'system'
-      } catch {}
-    }
-  }
-  return { role, actorId }
-}
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function GET(request: NextRequest) {
-  const { role } = getRoleAndActor(request)
+  const { role } = await getRoleAndActor(request)
 
   if (!['PHARMACIST', 'ADMIN', 'DOCTOR'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
@@ -39,7 +24,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
 
   if (!['PHARMACIST', 'ADMIN'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Only pharmacists can manage inventory' }, { status: 403 })

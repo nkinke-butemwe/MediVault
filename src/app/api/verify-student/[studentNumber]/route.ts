@@ -2,26 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 import { queryUNZASIS } from '@/src/lib/unza-sis-mock'
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { studentNumber: string } }
 ) {
-  // Read role from middleware headers
-  let effectiveRole = request.headers.get('x-user-role')
-  let actorId = request.headers.get('x-user-id') ?? 'system'
-
-  // Fallback: middleware didn't attach headers, decode JWT cookie directly
-  if (!effectiveRole) {
-    const token = request.cookies.get('medivault_token')?.value
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        effectiveRole = payload.role
-        actorId = payload.userId ?? 'system'
-      } catch {}
-    }
-  }
+  const { role: effectiveRole, actorId } = await getRoleAndActor(request)
 
   // Only receptionists, doctors, and admins can verify students
   if (!['RECEPTIONIST', 'DOCTOR', 'ADMIN'].includes(effectiveRole || '')) {

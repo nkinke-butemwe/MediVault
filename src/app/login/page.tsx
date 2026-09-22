@@ -160,7 +160,7 @@ export default function LoginPage() {
                 {/* Stats */}
                 <div className="flex gap-8">
                   {[
-                    { num: '5', label: 'User roles' },
+                    { num: '7', label: 'User roles' },
                     { num: '24/7', label: 'Secure access' },
                     { num: '100%', label: 'Paperless' },
                   ].map((s) => (
@@ -257,6 +257,7 @@ export default function LoginPage() {
                   <option value="ADMIN">Administrator</option>
                   <option value="NEXT_OF_KIN">Next of Kin</option>
                   <option value="PHARMACIST">Pharmacist</option>
+                  <option value="LAB_TECHNICIAN">Lab Technician</option>
                 </select>
               </div>
 

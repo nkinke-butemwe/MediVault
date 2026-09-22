@@ -1,67 +1,19 @@
 // src/lib/auth.ts
 // JWT authentication utilities — sign tokens, verify them, and manage httpOnly cookies
 
-import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { JWTPayload, Role } from '@/src/types'
+import {
+  AUTH_COOKIE_NAME,
+  SESSION_DURATION_SECONDS,
+  signToken,
+  verifyToken,
+} from '@/src/lib/jwt'
 
-// The cookie name used to store the JWT
-export const AUTH_COOKIE_NAME = 'medivault_token'
-
-// Session duration: 8 hours (in seconds)
-const SESSION_DURATION_SECONDS = 8 * 60 * 60
-
-// Get the JWT secret as a Uint8Array (required by the jose library)
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is not set')
-  }
-  return new TextEncoder().encode(secret)
-}
-
-// ─── Token Creation ────────────────────────────────────────────────────────
-
-// Creates a signed JWT containing the user's basic info
-// This token is stored in an httpOnly cookie so JavaScript cannot read it (XSS protection)
-export async function signToken(payload: JWTPayload): Promise<string> {
-  const secret = getJwtSecret()
-
-  const token = await new SignJWT({
-    userId: payload.userId,
-    email: payload.email,
-    role: payload.role,
-    fullName: payload.fullName,
-  })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
-    .sign(secret)
-
-  return token
-}
-
-// ─── Token Verification ────────────────────────────────────────────────────
-
-// Verifies a JWT token and returns the decoded payload, or null if invalid/expired
-export async function verifyToken(token: string): Promise<JWTPayload | null> {
-  try {
-    const secret = getJwtSecret()
-    const { payload } = await jwtVerify(token, secret)
-
-    // Pull the fields we care about out of the generic payload object
-    return {
-      userId: payload.userId as string,
-      email: payload.email as string,
-      role: payload.role as Role,
-      fullName: payload.fullName as string,
-    }
-  } catch {
-    // Token is expired, tampered with, or otherwise invalid
-    return null
-  }
-}
+// Token signing/verifying lives in src/lib/jwt.ts (so the Edge middleware can
+// use it too). Re-exported here so existing imports keep working.
+export { AUTH_COOKIE_NAME, signToken, verifyToken }
 
 // ─── Cookie Management ────────────────────────────────────────────────────
 
@@ -78,6 +30,22 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
   if (!token) return null
   return verifyToken(token)
+}
+
+// The one way API routes find out WHO is calling and WHAT ROLE they have.
+//
+// It verifies the JWT signature from the cookie. It deliberately does not
+// trust x-user-* request headers (a client can send any header it likes) and
+// never decodes the token without verifying it.
+//
+// Not logged in / forged / expired token  ->  { role: null, actorId: 'system' }
+// so every route's existing "is this role allowed?" check simply says no.
+export async function getRoleAndActor(
+  request: NextRequest
+): Promise<{ role: Role | null; actorId: string }> {
+  const user = await getTokenFromRequest(request)
+  if (!user) return { role: null, actorId: 'system' }
+  return { role: user.role, actorId: user.userId }
 }
 
 // Sets the auth cookie by writing the raw Set-Cookie header directly.

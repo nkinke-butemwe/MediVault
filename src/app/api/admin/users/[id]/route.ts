@@ -7,13 +7,13 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/src/lib/prisma'
 import { UpdateUserSchema, ResetPasswordSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const role = request.headers.get('x-user-role')
-  const actorId = request.headers.get('x-user-id')!
+  const { role, actorId } = await getRoleAndActor(request)
 
   if (role !== 'ADMIN') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
@@ -93,8 +93,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const role = request.headers.get('x-user-role')
-  const actorId = request.headers.get('x-user-id')!
+  const { role, actorId } = await getRoleAndActor(request)
 
   if (role !== 'ADMIN') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })

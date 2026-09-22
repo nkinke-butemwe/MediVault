@@ -17,6 +17,88 @@ should not be edited once later versions exist.
 
 ## [Unreleased]
 
+### Security
+
+- **Anyone could log in as any user by writing their own cookie.** The
+  middleware and 14 API routes read the user's role out of the
+  `medivault_token` cookie with `JSON.parse(atob(token.split('.')[1]))`.
+  That only base64-decodes the middle part of the token — it never checks
+  the signature — so a hand-made token such as
+  `header.{"role":"ADMIN","userId":"x","exp":9999999999}.anything` was
+  accepted as a genuine administrator session.
+  - Added `src/lib/jwt.ts` with `signToken()` and `verifyToken()` (moved out
+    of `src/lib/auth.ts`, which re-exports them so existing imports still
+    work). `verifyToken()` checks the signature and the expiry, pins the
+    algorithm to HS256, and rejects a token that is missing its fields. It
+    has no `next/headers` import, so the Edge middleware can use it too.
+  - Added `getRoleAndActor(request)` to `src/lib/auth.ts`. It is the one
+    way an API route learns who is calling, and it verifies the cookie. All
+    16 routes now use it: 14 had their own copy of the unsafe decode and 2
+    read the `x-user-role` / `x-user-id` headers directly. It no longer
+    trusts those headers at all, because a client can send any header it
+    likes.
+- **The route-protection middleware was not running at all**, for two
+  separate reasons, so no page or API route was protected by it:
+  1. `middleware.ts` was in the project root, but this project keeps its
+     code in `src/`, and Next.js only loads middleware from `src/` in that
+     case. The build's middleware manifest was empty. Moved it to
+     `src/middleware.ts`; the build now reports "Middleware" and the
+     manifest lists it. (This is also why every API route had grown its own
+     "middleware didn't attach headers" fallback.)
+  2. `PUBLIC_PATHS` contained `'/'` and paths were matched with
+     `startsWith`, so **every** path counted as public and the middleware
+     returned immediately. `/` is now matched exactly and the other public
+     paths by prefix.
+  - The middleware now verifies the token with `verifyToken()` and no
+    longer sets `x-user-*` headers, and the `console.log` that printed the
+    role and path of every request was removed.
+  - Checked against the real production server (`next build` + `next
+    start`): no cookie is redirected to `/login` (pages) or gets `401`
+    (API); a forged token and a token signed with another secret are both
+    rejected; a genuine token reaches its own dashboard; a lab technician
+    who opens `/dashboard/admin` is redirected to `/dashboard/lab`.
+- **Removed the `/api/debug` route.** It was listed in `PUBLIC_PATHS` (open
+  to anyone) and its file contained a copy of the `/api/auth/me` code.
+
+### Added
+
+- **Laboratory module**: doctors order tests, a lab technician records the
+  results, the doctor reviews them, and only then does the patient see them.
+  - New role `LAB_TECHNICIAN` (demo login `lab@unza.zm`) with its own
+    dashboard at `/dashboard/lab`: a work queue (urgent orders first, then
+    oldest first) with "Mark sample collected" and a results form, plus a
+    Completed tab.
+  - New database tables `LabTest` (the catalogue and its reference ranges),
+    `LabOrder` and `LabOrderItem`, new enums `LabOrderStatus`,
+    `LabPriority` and `LabFlag`, and the migration
+    `20260921120000_add_lab_module`. Each ordered test **copies** its unit
+    and ranges from the catalogue at the time of ordering, so editing the
+    catalogue later never changes what an old result means.
+  - Order lifecycle: `ORDERED` -> `COLLECTED` -> `COMPLETED` (or
+    `CANCELLED`). Each step is a guarded database update, so two people
+    cannot both move the same order.
+  - Results are flagged **by the server**, never by the browser:
+    `NORMAL`, `LOW`, `HIGH`, `CRITICAL_LOW`, `CRITICAL_HIGH`, or `ABNORMAL`
+    for yes/no tests such as the malaria RDT (see `computeFlag()` in
+    `src/lib/lab.ts`). The lab technician gets a warning toast on a
+    critical value and the order card shows a red banner.
+  - Release step: the patient only sees an order once it is `COMPLETED` and
+    the ordering doctor has reviewed it (optionally with a comment).
+    Next of Kin accounts cannot see lab results.
+  - New API: `GET /api/lab/tests`, `GET`/`POST /api/lab/orders`,
+    `PATCH /api/lab/orders/:id` (`collect`, `cancel`, `review`) and
+    `PUT /api/lab/orders/:id/results`. Ordering, entering results, collecting
+    and reviewing are written to the access log, as is viewing a patient's
+    lab orders.
+  - UI: a "Lab Tests" tab on the doctor dashboard, a "Lab Results" tab on
+    the patient dashboard, a shared `LabOrderCard` component, a `FlaskIcon`,
+    and sidebar entries for all three roles.
+  - The seed adds the lab technician, a catalogue of 8 tests, and three
+    sample orders (one released, one with a critical result waiting for
+    review, one waiting in the queue).
+- **The seed now stocks the pharmacy** (5 common drugs) if the inventory is
+  empty, because dispensing now needs stock to exist.
+
 ### Fixed
 
 - **Sidebar links did nothing on every account.** The Patient,
@@ -107,8 +189,38 @@ should not be edited once later versions exist.
     pages. The long header dates (for example "Saturday, 19 September
     2026") already spell out the month, so they were left alone.
 
+- **Dispensing a prescription did not work, and never touched the stock.**
+  - The route folder was named `[Id]` (capital I) but the code read
+    `params.id`, so the prescription id was `undefined`. Renamed the folder
+    to `[id]`. (On Windows, if Git does not pick up a case-only rename, run
+    `git mv "src/app/api/prescriptions/[Id]" tmp && git mv tmp "src/app/api/prescriptions/[id]"`.)
+  - Even when it ran, it only flipped the status to `DISPENSED`; the drug
+    inventory was never reduced. Dispensing now runs in one transaction that
+    (1) claims the prescription, so two pharmacists cannot dispense it
+    twice, (2) takes the prescribed quantities out of the inventory, using
+    the batch that expires first and never an expired or empty batch, and
+    (3) rolls everything back with a clear message if any drug is missing or
+    short (for example "Not enough Amoxicillin: need 50, only 20 in
+    stock"). Stock updates are guarded so a quantity can never go below
+    zero. The planning logic is in `src/lib/pharmacy.ts`.
+  - Prescriptions now require a whole-number quantity for every medication
+    (checked on the doctor form and by a new Zod schema on
+    `POST /api/prescriptions`, which previously had no validation). Older
+    prescriptions with no quantity can still be dispensed, with a warning
+    that their stock was not adjusted.
+- **The admin screens could not create or filter Pharmacist accounts.**
+  `PHARMACIST` was missing from the role dropdowns on the admin Users page
+  and from `CreateUserSchema` / `UpdateUserSchema`, so the API refused it.
+  Both schemas, the dropdowns and the role colours now include `PHARMACIST`
+  and `LAB_TECHNICIAN`, and the roles are defined once in `ROLE_VALUES`.
+  The "User roles" figure on the login page now says 7 (it said 5).
+- **`npm run build` failed on a type error in `src/lib/rate-limit.ts`**
+  (iterating a `Map` with `for...of`). Wrapped it in `Array.from()`.
+
 ### Changed
 
+- **`middleware.ts` moved to `src/middleware.ts`** (see Security). `middleware-old.ts`
+  in the project root is unused and can be deleted.
 - **Removed emoji from the prescription buttons and headings**, in line
   with the rest of the UI using the SVG icon set instead of emoji:
   "Prescribe" (patient header card), "Send Prescription to Pharmacy"
@@ -128,6 +240,27 @@ should not be edited once later versions exist.
 
 ### Tests
 
+- Added `tests/unit/middleware.test.ts` (15 tests). It checks the middleware
+  with hand-made tokens, tokens signed with another secret, expired tokens,
+  `alg: none` tokens and forged `x-user-role` headers, that unauthenticated
+  requests are stopped, that `/`, `/login` and `/api/auth/login` stay public,
+  and the role-to-dashboard rules (including `LAB_TECHNICIAN`). 12 of the 15
+  fail against the previous middleware.
+- Added `tests/unit/request-auth.test.ts` for `getRoleAndActor()`.
+- Added `tests/unit/pharmacy.test.ts` for stock deduction (case-insensitive
+  and generic-name matching, expiry, earliest-expiry-first across batches,
+  no half-dispensing, no double promising) and the prescription schema.
+- Added `tests/unit/lab.test.ts` for result flagging (limits, critical
+  values, a value of zero, yes/no tests), the reference-range text and the
+  lab input schemas.
+- Added `tests/unit/route-safety.test.ts`, which reads the source and fails
+  if anything decodes a token with `atob`, an API route reads `x-user-*`
+  headers, an API route does not call `getRoleAndActor`, a route file
+  exports anything other than HTTP handlers (this breaks `next build`), or a
+  dynamic folder name does not match the `params` key it reads (the `[Id]`
+  bug).
+- Updated the role test for `LAB_TECHNICIAN` and added `FlaskIcon` to the
+  icon test. The suite went from 78 to 140 tests.
 - Added `tests/unit/roles-and-format.test.ts` covering the role-to-dashboard
   map (including `PHARMACIST` and unknown roles) and `formatDoctorName`
   (with and without an existing title, `Dr`/`dr`/repeated titles, a name

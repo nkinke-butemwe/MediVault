@@ -4,22 +4,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
-
-function getRoleAndActor(request: NextRequest) {
-  let role = request.headers.get('x-user-role')
-  let actorId = request.headers.get('x-user-id') ?? 'system'
-  if (!role) {
-    const token = request.cookies.get('medivault_token')?.value
-    if (token) { try { const p = JSON.parse(atob(token.split('.')[1])); role = p.role; actorId = p.userId ?? 'system' } catch {} }
-  }
-  return { role, actorId }
-}
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
 
   // Only the next of kin themselves can grant/revoke consent
   if (role !== 'NEXT_OF_KIN' && role !== 'ADMIN') {

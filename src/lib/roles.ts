@@ -15,6 +15,7 @@ export const ROLE_DASHBOARDS: Record<Role, string> = {
   ADMIN: '/dashboard/admin',
   NEXT_OF_KIN: '/dashboard/next-of-kin',
   PHARMACIST: '/dashboard/pharmacy',
+  LAB_TECHNICIAN: '/dashboard/lab',
 }
 
 // Returns the dashboard path for a role, or '/login' if the role is unknown.

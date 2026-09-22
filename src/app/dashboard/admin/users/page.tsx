@@ -16,6 +16,8 @@ const ROLE_COLORS: Record<string, string> = {
   RECEPTIONIST: 'bg-purple-100 text-purple-800',
   ADMIN: 'bg-orange-100 text-orange-800',
   NEXT_OF_KIN: 'bg-pink-100 text-pink-800',
+  PHARMACIST: 'bg-green-100 text-green-800',
+  LAB_TECHNICIAN: 'bg-cyan-100 text-cyan-800',
 }
 
 export default function AdminUsersPage() {
@@ -182,6 +184,8 @@ export default function AdminUsersPage() {
           <option value="RECEPTIONIST">Receptionist</option>
           <option value="ADMIN">Admin</option>
           <option value="NEXT_OF_KIN">Next of Kin</option>
+          <option value="PHARMACIST">Pharmacist</option>
+          <option value="LAB_TECHNICIAN">Lab Technician</option>
         </select>
       </div>
 
@@ -314,6 +318,8 @@ export default function AdminUsersPage() {
                 <option value="DOCTOR">Doctor</option>
                 <option value="ADMIN">Administrator</option>
                 <option value="NEXT_OF_KIN">Next of Kin</option>
+                <option value="PHARMACIST">Pharmacist</option>
+                <option value="LAB_TECHNICIAN">Lab Technician</option>
               </select>
               {newUser.role === 'PATIENT' && (
                 <input

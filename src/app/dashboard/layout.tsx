@@ -26,6 +26,7 @@ import {
   LogOutIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  FlaskIcon,
   type IconProps,
 } from '@/src/components/icons'
 
@@ -34,6 +35,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'My Dashboard', href: '/dashboard/patient', icon: HomeIcon },
     { label: 'Medical Records', href: '/dashboard/patient#records', icon: FileTextIcon },
     { label: 'My Visits', href: '/dashboard/patient#visits', icon: CalendarIcon },
+    { label: 'Lab Results', href: '/dashboard/patient#labs', icon: FlaskIcon },
     { label: 'Next of Kin', href: '/dashboard/patient#kin', icon: HeartIcon },
     { label: 'Access Logs', href: '/dashboard/patient#logs', icon: ClipboardListIcon },
   ],
@@ -47,6 +49,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'Dashboard', href: '/dashboard/doctor', icon: HomeIcon },
     { label: 'Patient Search', href: '/dashboard/doctor#search', icon: SearchIcon },
     { label: 'Add Record', href: '/dashboard/doctor#add-record', icon: ClipboardIcon },
+    { label: 'Lab Tests', href: '/dashboard/doctor#labs', icon: FlaskIcon },
   ],
   ADMIN: [
     { label: 'Dashboard', href: '/dashboard/admin', icon: HomeIcon },
@@ -62,6 +65,11 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'Prescriptions', href: '/dashboard/pharmacy#prescriptions', icon: ClipboardIcon },
     { label: 'Drug Inventory', href: '/dashboard/pharmacy#inventory', icon: ClipboardListIcon },
   ],
+  LAB_TECHNICIAN: [
+    { label: 'Dashboard', href: '/dashboard/lab', icon: HomeIcon },
+    { label: 'Work Queue', href: '/dashboard/lab#queue', icon: FlaskIcon },
+    { label: 'Completed', href: '/dashboard/lab#completed', icon: ClipboardListIcon },
+  ],
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -71,6 +79,7 @@ const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrator',
   NEXT_OF_KIN: 'Next of Kin',
   PHARMACIST: 'Pharmacist',
+  LAB_TECHNICIAN: 'Lab Technician',
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

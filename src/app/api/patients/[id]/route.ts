@@ -6,22 +6,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/src/lib/prisma'
 import { UpdatePatientProfileSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
-
-function getRoleAndActor(request: NextRequest) {
-  let role = request.headers.get('x-user-role')
-  let actorId = request.headers.get('x-user-id') ?? 'system'
-  if (!role) {
-    const token = request.cookies.get('medivault_token')?.value
-    if (token) { try { const p = JSON.parse(atob(token.split('.')[1])); role = p.role; actorId = p.userId ?? 'system' } catch {} }
-  }
-  return { role, actorId }
-}
+import { getRoleAndActor } from '@/src/lib/auth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
   const { id } = params
 
   // Patients can view their own profile; staff can view any patient
@@ -70,7 +61,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { role, actorId } = getRoleAndActor(request)
+  const { role, actorId } = await getRoleAndActor(request)
   const { id } = params
 
   // Patients can update their own profile; admins can update any profile

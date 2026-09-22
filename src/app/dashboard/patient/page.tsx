@@ -9,7 +9,8 @@ import { useAuth } from '@/src/hooks/useAuth'
 import { useHashSection } from '@/src/hooks/useHashSection'
 import { formatDate, formatDateTime, formatDoctorName } from '@/src/lib/format'
 import toast from 'react-hot-toast'
-import type { MedicalRecord, Visit, NextOfKinAssignment, AccessLog, Medication } from '@/src/types'
+import type { MedicalRecord, Visit, NextOfKinAssignment, AccessLog, Medication, LabOrder } from '@/src/types'
+import LabOrderCard from '@/src/components/lab/LabOrderCard'
 import {
   FileTextIcon,
   CalendarIcon,
@@ -77,7 +78,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const PATIENT_SECTIONS = ['overview', 'records', 'visits', 'kin', 'logs'] as const
+const PATIENT_SECTIONS = ['overview', 'records', 'visits', 'labs', 'kin', 'logs'] as const
 
 export default function PatientDashboard() {
   const { user, loading: authLoading } = useAuth()
@@ -85,6 +86,7 @@ export default function PatientDashboard() {
   // Data state
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [visits, setVisits] = useState<Visit[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   const [kinAssignments, setKinAssignments] = useState<NextOfKinAssignment[]>([])
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
   const [dataLoading, setDataLoading] = useState(true)
@@ -102,20 +104,23 @@ export default function PatientDashboard() {
     if (!user) return
     setDataLoading(true)
     try {
-      const [recRes, visitRes, kinRes, logRes] = await Promise.all([
+      const [recRes, visitRes, labRes, kinRes, logRes] = await Promise.all([
         fetch(`/api/medical-records?patientId=${user.id}`),
         fetch(`/api/visits?patientId=${user.id}`),
+        fetch('/api/lab/orders'),
         fetch(`/api/next-of-kin?patientId=${user.id}`),
         fetch(`/api/access-logs`),
       ])
-      const [recData, visitData, kinData, logData] = await Promise.all([
+      const [recData, visitData, labData, kinData, logData] = await Promise.all([
         recRes.json(),
         visitRes.json(),
+        labRes.json(),
         kinRes.json(),
         logRes.json(),
       ])
       if (recData.success) setRecords(recData.data)
       if (visitData.success) setVisits(visitData.data)
+      if (labData.success) setLabOrders(labData.data)
       if (kinData.success) setKinAssignments(kinData.data)
       if (logData.success) setAccessLogs(logData.data.items)
     } catch {
@@ -175,7 +180,7 @@ export default function PatientDashboard() {
 
       {/* Section tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(['overview', 'records', 'visits', 'kin', 'logs'] as const).map((s) => (
+        {PATIENT_SECTIONS.map((s) => (
           <button
             key={s}
             onClick={() => setActiveSection(s)}
@@ -334,6 +339,21 @@ export default function PatientDashboard() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Lab Results Section ───────────────────────────────────────── */}
+      {activeSection === 'labs' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-[#0f3b5c]">Lab Results ({labOrders.length})</h2>
+            <p className="text-sm text-slate-500 mt-1">Results appear here once your doctor has reviewed them.</p>
+          </div>
+          {labOrders.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center text-slate-400 shadow-sm">No lab results yet.</div>
+          ) : (
+            labOrders.map((order) => <LabOrderCard key={order.id} order={order} />)
+          )}
         </div>
       )}
 

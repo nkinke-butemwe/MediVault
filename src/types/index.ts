@@ -3,7 +3,14 @@
 
 // ─── Enums (mirror Prisma enums for frontend use) ──────────────────────────
 
-export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN' | 'NEXT_OF_KIN' | 'PHARMACIST'
+export type Role =
+  | 'PATIENT'
+  | 'RECEPTIONIST'
+  | 'DOCTOR'
+  | 'ADMIN'
+  | 'NEXT_OF_KIN'
+  | 'PHARMACIST'
+  | 'LAB_TECHNICIAN'
 export type VisitStatus = 'WAITING' | 'CHECKED_IN' | 'IN_CONSULTATION' | 'CHECKED_OUT' | 'CANCELLED'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -82,6 +89,64 @@ export interface Visit {
   createdBy: Pick<AuthUser, 'id' | 'fullName'>
   createdAt: string
   updatedAt: string
+}
+
+// ─── Laboratory ───────────────────────────────────────────────────────────
+
+export type LabOrderStatus = 'ORDERED' | 'COLLECTED' | 'COMPLETED' | 'CANCELLED'
+export type LabPriority = 'ROUTINE' | 'URGENT'
+export type LabFlag = 'NORMAL' | 'LOW' | 'HIGH' | 'CRITICAL_LOW' | 'CRITICAL_HIGH' | 'ABNORMAL'
+
+// A test in the clinic lab's catalogue
+export interface LabTestInfo {
+  id: string
+  code: string
+  name: string
+  category: string
+  unit: string | null
+  refLow: number | null
+  refHigh: number | null
+  normalText: string | null
+  allowedResults: string | null
+}
+
+// One test inside an order, plus its result once the lab has run it
+export interface LabOrderItem {
+  id: string
+  orderId: string
+  testId: string
+  test: Pick<LabTestInfo, 'id' | 'code' | 'name' | 'category' | 'allowedResults'>
+  unit: string | null
+  refLow: number | null
+  refHigh: number | null
+  criticalLow: number | null
+  criticalHigh: number | null
+  normalText: string | null
+  valueNumeric: number | null
+  valueText: string | null
+  flag: LabFlag | null
+  notes: string | null
+  resultAt: string | null
+}
+
+export interface LabOrder {
+  id: string
+  patientId: string
+  patient: Pick<AuthUser, 'id' | 'fullName' | 'email' | 'studentNumber'>
+  orderedBy: { id: string; fullName: string }
+  collectedBy: { id: string; fullName: string } | null
+  completedBy: { id: string; fullName: string } | null
+  reviewedBy: { id: string; fullName: string } | null
+  priority: LabPriority
+  status: LabOrderStatus
+  clinicalNotes: string | null
+  collectedAt: string | null
+  completedAt: string | null
+  reviewedAt: string | null
+  doctorComment: string | null
+  createdAt: string
+  updatedAt: string
+  items: LabOrderItem[]
 }
 
 // ─── Next of Kin ──────────────────────────────────────────────────────────

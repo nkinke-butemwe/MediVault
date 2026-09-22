@@ -83,7 +83,9 @@ export default function PharmacyDashboard() {
       const res = await fetch(`/api/prescriptions/${id}/dispense`, { method: 'POST' })
       const data = await res.json()
       if (data.success) {
-        toast.success('Prescription dispensed successfully')
+        toast.success('Prescription dispensed and stock updated')
+        // e.g. older prescriptions that have no quantity, so no stock could be taken
+        for (const warning of (data.warnings ?? []) as string[]) toast(warning, { icon: '⚠️' })
         fetchPrescriptions()
       } else toast.error(data.error || 'Failed to dispense')
     } catch { toast.error('Network error') }

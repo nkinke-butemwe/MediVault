@@ -265,6 +265,16 @@ export function PillIcon(props: IconProps) {
   )
 }
 
+export function FlaskIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 3h6" />
+      <path d="M10 3v6.5L4.6 18.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9.5V3" />
+      <line x1="7.5" y1="15" x2="16.5" y2="15" />
+    </IconBase>
+  )
+}
+
 export function CalendarIcon(props: IconProps) {
   return (
     <IconBase {...props}>

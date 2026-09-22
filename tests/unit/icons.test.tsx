@@ -47,12 +47,14 @@ import {
   ChevronDownIcon,
   LogOutIcon,
   ShieldCheckIcon,
+  FlaskIcon,
 } from '@/src/components/icons'
 
 // Every icon component used somewhere in the app. If someone adds a new
 // icon to icons.tsx, adding it to this list gives it the same basic
 // safety checks as all the others.
 const allIcons = {
+  FlaskIcon,
   ShieldIcon,
   LockIcon,
   HospitalIcon,

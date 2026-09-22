@@ -15,8 +15,10 @@ import {
   ArrowLeftIcon,
   CloseIcon,
   SaveIcon,
+  FlaskIcon,
 } from '@/src/components/icons'
 import { formatDate } from '@/src/lib/format'
+import DoctorLabPanel from '@/src/components/lab/DoctorLabPanel'
 
 interface PatientSearchResult {
   id: string
@@ -43,7 +45,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe'] as const
+const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe', 'labs'] as const
 
 export default function DoctorDashboard() {
   const { user } = useAuth()
@@ -148,6 +150,8 @@ export default function DoctorDashboard() {
     if (!selectedPatient) return
     const validMeds = prescriptionMeds.filter(m => m.name.trim())
     if (validMeds.length === 0) { toast.error('Add at least one medication'); return }
+    // The pharmacy takes this many units out of stock, so every medication needs one
+    if (validMeds.some(m => !(Number(m.quantity) > 0))) { toast.error('Enter a quantity for every medication'); return }
     setSendingPrescription(true)
     try {
       const res = await fetch('/api/prescriptions', {
@@ -208,6 +212,10 @@ export default function DoctorDashboard() {
         <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('prescribe') }}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'prescribe' ? 'bg-green-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
           <PillIcon size={16} /> Send Prescription
+        </button>
+        <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('labs') }}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'labs' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <FlaskIcon size={16} /> Lab Tests
         </button>
       </div>
 
@@ -519,6 +527,17 @@ export default function DoctorDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lab tests: order and review results for the selected patient */}
+      {activeSection === 'labs' && selectedPatient && (
+        <div className="space-y-4">
+          <button onClick={() => setActiveSection('search')}
+            className="text-sm text-slate-500 hover:text-[#0f3b5c] inline-flex items-center gap-1.5">
+            <ArrowLeftIcon size={14} /> Back
+          </button>
+          <DoctorLabPanel patientId={selectedPatient.id} patientName={selectedPatient.fullName} />
         </div>
       )}
     </div>

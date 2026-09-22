@@ -15,8 +15,12 @@ describe('getDashboardPath', () => {
 
   it('has a dashboard for every role', () => {
     expect(Object.keys(ROLE_DASHBOARDS).sort()).toEqual(
-      ['ADMIN', 'DOCTOR', 'NEXT_OF_KIN', 'PATIENT', 'PHARMACIST', 'RECEPTIONIST']
+      ['ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'NEXT_OF_KIN', 'PATIENT', 'PHARMACIST', 'RECEPTIONIST']
     )
+  })
+
+  it('sends a lab technician to the lab dashboard', () => {
+    expect(getDashboardPath('LAB_TECHNICIAN')).toBe('/dashboard/lab')
   })
 
   it('sends an unknown role to /login instead of a patient dashboard', () => {
