@@ -8,6 +8,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import type { AuthUser, Role } from '@/src/types'
 import DashboardSkeleton from '@/src/components/DashboardSkeleton'
+import NotificationBell from '@/src/components/NotificationBell'
 import {
   HASH_CHANGE_EVENT,
   setUrlHash,
@@ -27,15 +28,20 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   FlaskIcon,
+  ActivityIcon,
+  MessageIcon,
   type IconProps,
 } from '@/src/components/icons'
 
 const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType<IconProps> }[]> = {
   PATIENT: [
     { label: 'My Dashboard', href: '/dashboard/patient', icon: HomeIcon },
+    { label: 'Care Timeline', href: '/dashboard/patient#timeline', icon: ActivityIcon },
     { label: 'Medical Records', href: '/dashboard/patient#records', icon: FileTextIcon },
     { label: 'My Visits', href: '/dashboard/patient#visits', icon: CalendarIcon },
+    { label: 'Appointments', href: '/dashboard/patient#appointments', icon: CalendarIcon },
     { label: 'Lab Results', href: '/dashboard/patient#labs', icon: FlaskIcon },
+    { label: 'Messages', href: '/dashboard/patient#messages', icon: MessageIcon },
     { label: 'Next of Kin', href: '/dashboard/patient#kin', icon: HeartIcon },
     { label: 'Access Logs', href: '/dashboard/patient#logs', icon: ClipboardListIcon },
   ],
@@ -43,6 +49,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'Dashboard', href: '/dashboard/receptionist', icon: HomeIcon },
     { label: 'Verify Student', href: '/dashboard/receptionist#verify', icon: SearchIcon },
     { label: "Today's Visits", href: '/dashboard/receptionist#visits', icon: CalendarIcon },
+    { label: 'Appointment Requests', href: '/dashboard/receptionist#requests', icon: ClipboardListIcon },
     { label: 'Register Patient', href: '/dashboard/receptionist#register', icon: UserPlusIcon },
   ],
   DOCTOR: [
@@ -50,6 +57,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'Patient Search', href: '/dashboard/doctor#search', icon: SearchIcon },
     { label: 'Add Record', href: '/dashboard/doctor#add-record', icon: ClipboardIcon },
     { label: 'Lab Tests', href: '/dashboard/doctor#labs', icon: FlaskIcon },
+    { label: 'Messages', href: '/dashboard/doctor#messages', icon: MessageIcon },
   ],
   ADMIN: [
     { label: 'Dashboard', href: '/dashboard/admin', icon: HomeIcon },
@@ -260,6 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {sidebarOpen ? <ChevronLeftIcon size={18} /> : <ChevronRightIcon size={18} />}
           </button>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <span className="text-sm text-slate-500">
               {new Date().toLocaleDateString('en-ZM', {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',

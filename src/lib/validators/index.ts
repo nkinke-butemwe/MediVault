@@ -170,3 +170,43 @@ export const LabOrderActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('cancel') }),
   z.object({ action: z.literal('review'), doctorComment: z.string().trim().max(1000).optional().nullable() }),
 ])
+
+// ─── Appointment requests ─────────────────────────────────────────────────
+
+export const CreateAppointmentRequestSchema = z.object({
+  // An ISO date string such as "2026-10-20" (the date picker sends this)
+  preferredDate: z.string().min(1, 'Please choose a date'),
+  reason: z.string().trim().min(3, 'Please say why you want to come in').max(300, 'Please keep the reason under 300 characters'),
+})
+
+export const AppointmentActionSchema = z.discriminatedUnion('action', [
+  // Receptionist: agree to a date/time (creates the visit)
+  z.object({
+    action: z.literal('confirm'),
+    scheduledFor: z.string().min(1, 'Choose the appointment date'),
+    responseNote: z.string().trim().max(500).optional().nullable(),
+  }),
+  // Receptionist: say no, with a reason the patient will read
+  z.object({
+    action: z.literal('decline'),
+    responseNote: z.string().trim().min(3, 'Please give the patient a reason').max(500),
+  }),
+  // Patient: withdraw their own request
+  z.object({ action: z.literal('cancel') }),
+])
+
+// ─── Messages ─────────────────────────────────────────────────────────────
+
+export const SendMessageSchema = z.object({
+  // The other person in the thread (a doctor if you are the patient, a patient if you are the doctor)
+  recipientId: z.string().min(1, 'Choose who to message'),
+  body: z.string().trim().min(1, 'Write a message first').max(2000, 'Messages can be up to 2000 characters'),
+})
+
+// ─── Notifications ────────────────────────────────────────────────────────
+
+// Mark some notifications read, or all of them
+export const MarkNotificationsReadSchema = z.union([
+  z.object({ all: z.literal(true) }),
+  z.object({ ids: z.array(z.string().min(1)).min(1).max(100) }),
+])

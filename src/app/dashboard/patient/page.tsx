@@ -11,6 +11,9 @@ import { formatDate, formatDateTime, formatDoctorName } from '@/src/lib/format'
 import toast from 'react-hot-toast'
 import type { MedicalRecord, Visit, NextOfKinAssignment, AccessLog, Medication, LabOrder } from '@/src/types'
 import LabOrderCard from '@/src/components/lab/LabOrderCard'
+import TimelineView from '@/src/components/patient/TimelineView'
+import AppointmentsPanel from '@/src/components/patient/AppointmentsPanel'
+import MessagesPanel from '@/src/components/messages/MessagesPanel'
 import {
   FileTextIcon,
   CalendarIcon,
@@ -78,7 +81,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const PATIENT_SECTIONS = ['overview', 'records', 'visits', 'labs', 'kin', 'logs'] as const
+const PATIENT_SECTIONS = ['overview', 'timeline', 'records', 'visits', 'appointments', 'labs', 'messages', 'kin', 'logs'] as const
 
 export default function PatientDashboard() {
   const { user, loading: authLoading } = useAuth()
@@ -237,6 +240,16 @@ export default function PatientDashboard() {
           )}
         </div>
       )}
+
+      {/* ── Care Timeline Section ─────────────────────────────────────── */}
+      {activeSection === 'timeline' && <TimelineView />}
+
+      {/* ── Appointments Section ──────────────────────────────────────── */}
+      {/* After a request changes, reload the page data so "My Visits" stays current */}
+      {activeSection === 'appointments' && <AppointmentsPanel onChanged={fetchData} />}
+
+      {/* ── Messages Section ──────────────────────────────────────────── */}
+      {activeSection === 'messages' && user && <MessagesPanel viewerRole="PATIENT" viewerId={user.id} />}
 
       {/* ── Medical Records Section ───────────────────────────────────── */}
       {activeSection === 'records' && (

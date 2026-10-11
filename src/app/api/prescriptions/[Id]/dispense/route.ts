@@ -12,6 +12,7 @@ import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 import { getRoleAndActor } from '@/src/lib/auth'
 import { parsePrescribedItems, planStockDeductions } from '@/src/lib/pharmacy'
+import { notifyUser } from '@/src/lib/notifications'
 
 // Thrown inside the transaction to abort it with a message the pharmacist can read
 class DispenseError extends Error {
@@ -86,6 +87,14 @@ export async function POST(
       resourceId: params.id,
       details: { action: 'dispensed', stockTaken: deductions.map((d) => ({ drug: d.drugName, quantity: d.quantity })) },
       ...getRequestMeta(request),
+    })
+
+    // Let the patient know their medicine is ready to collect
+    await notifyUser(prescription.patientId, {
+      type: 'PRESCRIPTION_DISPENSED',
+      title: 'Your prescription is ready',
+      body: 'The pharmacy has dispensed your medication.',
+      link: '/dashboard/patient#timeline',
     })
 
     return NextResponse.json({ success: true, data: updated, warnings })

@@ -48,6 +48,10 @@ import {
   LogOutIcon,
   ShieldCheckIcon,
   FlaskIcon,
+  BellIcon,
+  MessageIcon,
+  SendIcon,
+  ActivityIcon,
 } from '@/src/components/icons'
 
 // Every icon component used somewhere in the app. If someone adds a new
@@ -90,6 +94,10 @@ const allIcons = {
   ChevronDownIcon,
   LogOutIcon,
   ShieldCheckIcon,
+  BellIcon,
+  MessageIcon,
+  SendIcon,
+  ActivityIcon,
 }
 
 describe('icon library', () => {

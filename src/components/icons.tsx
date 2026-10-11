@@ -399,3 +399,37 @@ export function DatabaseIcon(props: IconProps) {
     </IconBase>
   )
 }
+
+export function BellIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+    </IconBase>
+  )
+}
+
+export function MessageIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </IconBase>
+  )
+}
+
+export function SendIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </IconBase>
+  )
+}
+
+export function ActivityIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </IconBase>
+  )
+}

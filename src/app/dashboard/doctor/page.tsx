@@ -16,9 +16,13 @@ import {
   CloseIcon,
   SaveIcon,
   FlaskIcon,
+  MessageIcon,
+  ActivityIcon,
 } from '@/src/components/icons'
 import { formatDate } from '@/src/lib/format'
 import DoctorLabPanel from '@/src/components/lab/DoctorLabPanel'
+import MessagesPanel from '@/src/components/messages/MessagesPanel'
+import TimelineView from '@/src/components/patient/TimelineView'
 
 interface PatientSearchResult {
   id: string
@@ -45,7 +49,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe', 'labs'] as const
+const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe', 'labs', 'timeline', 'messages'] as const
 
 export default function DoctorDashboard() {
   const { user } = useAuth()
@@ -61,8 +65,10 @@ export default function DoctorDashboard() {
   const [requestedSection, setActiveSection] = useHashSection(DOCTOR_SECTIONS, 'search')
   // "Add record" and "Prescribe" only make sense once a patient is selected,
   // so without a patient we always fall back to showing the search section.
-  const activeSection = !selectedPatient ? 'search' : requestedSection
-  const needsPatientFirst = !selectedPatient && requestedSection !== 'search'
+  // The inbox ("messages") works without a selected patient, so it is allowed through.
+  const activeSection =
+    requestedSection === 'messages' ? 'messages' : !selectedPatient ? 'search' : requestedSection
+  const needsPatientFirst = !selectedPatient && requestedSection !== 'search' && requestedSection !== 'messages'
   const [newRecord, setNewRecord] = useState({ diagnosis: '', allergies: '', notes: '', followUpDate: '' })
   const [medications, setMedications] = useState<Medication[]>([{ name: '', dose: '', duration: '' }])
   const [savingRecord, setSavingRecord] = useState(false)
@@ -216,6 +222,14 @@ export default function DoctorDashboard() {
         <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('labs') }}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'labs' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
           <FlaskIcon size={16} /> Lab Tests
+        </button>
+        <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('timeline') }}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'timeline' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <ActivityIcon size={16} /> Timeline
+        </button>
+        <button onClick={() => setActiveSection('messages')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'messages' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <MessageIcon size={16} /> Messages
         </button>
       </div>
 
@@ -539,6 +553,26 @@ export default function DoctorDashboard() {
           </button>
           <DoctorLabPanel patientId={selectedPatient.id} patientName={selectedPatient.fullName} />
         </div>
+      )}
+
+      {/* Timeline: the selected patient's whole care history in one list */}
+      {activeSection === 'timeline' && selectedPatient && (
+        <div className="space-y-4">
+          <button onClick={() => setActiveSection('search')}
+            className="text-sm text-slate-500 hover:text-[#0f3b5c] inline-flex items-center gap-1.5">
+            <ArrowLeftIcon size={14} /> Back
+          </button>
+          <TimelineView patientId={selectedPatient.id} />
+        </div>
+      )}
+
+      {/* Messages: the doctor's inbox. If a patient is selected, they can be messaged from here too. */}
+      {activeSection === 'messages' && user && (
+        <MessagesPanel
+          viewerRole="DOCTOR"
+          viewerId={user.id}
+          startWith={selectedPatient ? { id: selectedPatient.id, fullName: selectedPatient.fullName } : undefined}
+        />
       )}
     </div>
   )

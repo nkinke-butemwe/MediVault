@@ -20,6 +20,10 @@ MediVault is a secure, web-based patient portal that digitises student medical r
 - **Next of Kin Consent**: Patients pre-assign a trusted person to grant emergency treatment consent
 - **Pharmacy**: Doctors send prescriptions to the pharmacy; dispensing one takes the stock out of the drug inventory (earliest-expiry batch first, never below zero) in a single database transaction
 - **Laboratory**: Doctors order tests from a catalogue with reference ranges; the lab technician records results; the server flags each one (normal / low / high / critical); the doctor reviews and releases results before the patient can see them
+- **Appointment Requests**: Patients ask for a date and reason; reception confirms (which books the visit) or declines with a reason
+- **Notifications**: A bell for every role — lab results released, prescription ready, appointment answered, new messages, new requests
+- **Care Timeline**: One chronological view of records, visits, prescriptions, released lab results and appointments
+- **Secure Messaging**: Private patient ↔ doctor conversations, limited to the doctors who actually treat the patient
 - **Access Audit Logging**: Every access to patient data is logged — who, when, what action
 - **JWT Authentication**: Tokens stored in httpOnly cookies (XSS-safe)
 - **RBAC Middleware**: Every route is protected; users can only access their own dashboards. Every token's signature is verified — in the middleware and again inside every API route
@@ -117,6 +121,10 @@ All accounts use the password: **`password123`**
 
 **To test the lab flow**: log in as Doctor 1 (`dr.mwanza@unza.zm`), search for a patient, open "Lab Tests" and order some tests. Then log in as the Lab Technician, record results in the Work Queue, go back to the Doctor, and use "Review results" to release them. The patient (for example Patient 1) will then see them under "Lab Results". The seed already contains one released result (Patient 1), one critical result waiting for review (Patient 3) and one order waiting in the lab queue (Patient 2).
 
+**To test appointments**: log in as Patient 1 → *Appointments*, send a request. Log in as the Receptionist → *Appointment Requests*, confirm it (it appears as a visit under Today's Visits if the date is today) or decline it with a reason. Back as the patient, check the bell and *Appointments*.
+
+**To test messaging**: log in as Patient 1 → *Messages* → open Dr. Mwanza (there is already a conversation). Then log in as Doctor 1 → *Messages* and reply. Patient 3 also has an unread message waiting in Dr. Mwanza's inbox.
+
 ---
 
 ## Available npm Scripts
@@ -153,6 +161,10 @@ medivault/
 │   │   │   ├── prescriptions/ # create + dispense (takes stock from inventory)
 │   │   │   ├── pharmacy/      # drug inventory
 │   │   │   ├── lab/           # test catalogue, orders, results, review
+│   │   │   ├── appointment-requests/  # patient requests + reception answers
+│   │   │   ├── notifications/ # bell: list + mark read
+│   │   │   ├── messages/      # patient <-> doctor threads
+│   │   │   ├── timeline/      # merged care history
 │   │   │   ├── next-of-kin/   # assignments + consent toggle
 │   │   │   ├── access-logs/   # audit log read + CSV export
 │   │   │   └── admin/users/   # admin user management
@@ -170,6 +182,10 @@ medivault/
 │   │   ├── globals.css        # Tailwind CSS + global styles
 │   │   └── page.tsx           # Root redirect (→ dashboard or login)
 │   ├── components/lab/        # Lab order card + doctor lab panel
+│   ├── components/patient/    # Care timeline + appointment requests
+│   ├── components/messages/   # Messaging panel (patient and doctor)
+│   ├── components/receptionist/ # Appointment request queue
+│   ├── components/NotificationBell.tsx  # Header bell used by every role
 │   ├── hooks/
 │   │   └── useAuth.ts         # Custom auth hook (fetch /api/auth/me)
 │   ├── middleware.ts          # Next.js route protection + RBAC (must live in src/)
@@ -178,6 +194,10 @@ medivault/
 │   │   ├── auth.ts            # Cookie helpers + getRoleAndActor() used by every API route
 │   │   ├── pharmacy.ts        # Stock deduction planning for dispensing
 │   │   ├── lab.ts             # Result flagging + reference-range helpers
+│   │   ├── appointments.ts    # Appointment date rules
+│   │   ├── notifications.ts   # Create bell notifications (never throws)
+│   │   ├── care-team.ts       # Which doctors may message which patient
+│   │   ├── timeline.ts        # Builds the merged care timeline
 │   │   ├── logger.ts          # Access logging utility + pino app logger
 │   │   ├── prisma.ts          # Prisma client singleton
 │   │   ├── rate-limit.ts      # In-memory rate limiter for login
@@ -213,6 +233,7 @@ medivault/
 - Docker containerisation
 - AES-256 encryption for sensitive fields at rest
 - Native mobile apps (iOS and Android)
+- Real-time notifications (WebSockets) and SMS/email delivery — today the bell checks every 30 seconds
 - Telemedicine / video consultation integration
 - NHIMA/MOH integration
 - Two-factor authentication

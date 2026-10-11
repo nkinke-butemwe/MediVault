@@ -59,6 +59,14 @@ enum LabFlag {
   ABNORMAL
 }
 
+// Appointment request: patient asks (REQUESTED) -> receptionist CONFIRMED / DECLINED, or patient CANCELLED
+enum AppointmentStatus {
+  REQUESTED
+  CONFIRMED
+  DECLINED
+  CANCELLED
+}
+
 // ─── Models ────────────────────────────────────────────────────────────────
 
 model User {
@@ -97,6 +105,15 @@ model User {
   labOrdersCollected   LabOrder[]            @relation("LabOrderCollectedBy")
   labOrdersCompleted   LabOrder[]            @relation("LabOrderCompletedBy")
   labOrdersReviewed    LabOrder[]            @relation("LabOrderReviewedBy")
+  // Appointment requests: made by this user (as patient), and handled by this user (as receptionist)
+  appointmentRequests  AppointmentRequest[]  @relation("AppointmentPatient")
+  appointmentsHandled  AppointmentRequest[]  @relation("AppointmentHandledBy")
+  // In-app notifications addressed to this user
+  notifications        Notification[]
+  // Secure messages: the patient side of a thread, the doctor side, and the ones this user wrote
+  messagesAsPatient    Message[]             @relation("MessagePatient")
+  messagesAsDoctor     Message[]             @relation("MessageDoctor")
+  messagesSent         Message[]             @relation("MessageSender")
 }
 
 model PatientProfile {
@@ -287,4 +304,68 @@ model LabOrderItem {
   test  LabTest  @relation(fields: [testId], references: [id])
 
   @@unique([orderId, testId])
+}
+
+// ─── Patient engagement: appointments, notifications, messages ──────────────
+
+// A patient asks for an appointment; a receptionist confirms (which creates a
+// Visit on the confirmed date) or declines it with a note.
+model AppointmentRequest {
+  id            String            @id @default(cuid())
+  patientId     String
+  patient       User              @relation("AppointmentPatient", fields: [patientId], references: [id])
+  // When the patient would like to come, and why
+  preferredDate DateTime
+  reason        String
+  status        AppointmentStatus @default(REQUESTED)
+  // Filled in when the receptionist answers
+  handledById   String?
+  handledBy     User?             @relation("AppointmentHandledBy", fields: [handledById], references: [id])
+  handledAt     DateTime?
+  scheduledFor  DateTime?
+  responseNote  String?
+  // The Visit created when the request was confirmed (plain id, no relation, so
+  // a visit can be removed without breaking the request history)
+  visitId       String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([patientId])
+  @@index([status])
+}
+
+// A short message shown in the bell menu: "your lab result is ready", etc.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Short machine-readable kind, e.g. "LAB_RESULT_READY" (used to pick an icon)
+  type      String
+  title     String
+  body      String?
+  // Where clicking the notification should take the user, e.g. "/dashboard/patient#labs"
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+// One message in a private thread between ONE patient and ONE doctor.
+// A thread is simply "all messages with this patientId + doctorId".
+model Message {
+  id        String    @id @default(cuid())
+  patientId String
+  patient   User      @relation("MessagePatient", fields: [patientId], references: [id])
+  doctorId  String
+  doctor    User      @relation("MessageDoctor", fields: [doctorId], references: [id])
+  // Who wrote it: either the patient or the doctor of the thread
+  senderId  String
+  sender    User      @relation("MessageSender", fields: [senderId], references: [id])
+  body      String
+  // Set when the OTHER person opens the thread
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([patientId, doctorId, createdAt])
 }

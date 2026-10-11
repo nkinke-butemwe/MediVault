@@ -149,6 +149,63 @@ export interface LabOrder {
   items: LabOrderItem[]
 }
 
+// ─── Appointment requests ─────────────────────────────────────────────────
+
+export type AppointmentStatus = 'REQUESTED' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED'
+
+export interface AppointmentRequest {
+  id: string
+  patientId: string
+  patient: Pick<AuthUser, 'id' | 'fullName' | 'email' | 'studentNumber'>
+  preferredDate: string
+  reason: string
+  status: AppointmentStatus
+  handledBy: { id: string; fullName: string } | null
+  handledAt: string | null
+  scheduledFor: string | null
+  responseNote: string | null
+  visitId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id: string
+  type: string
+  title: string
+  body: string | null
+  link: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+// ─── Messages ─────────────────────────────────────────────────────────────
+
+// One row in the list of conversations
+export interface ConversationSummary {
+  partner: { id: string; fullName: string }
+  lastMessage: string | null
+  lastMessageAt: string | null
+  unreadCount: number
+}
+
+export interface ChatMessage {
+  id: string
+  patientId: string
+  doctorId: string
+  senderId: string
+  sender: { id: string; fullName: string }
+  body: string
+  readAt: string | null
+  createdAt: string
+}
+
+// ─── Timeline ─────────────────────────────────────────────────────────────
+
+export type { TimelineEvent, TimelineKind } from '@/src/lib/timeline'
+
 // ─── Next of Kin ──────────────────────────────────────────────────────────
 
 export interface NextOfKinAssignment {

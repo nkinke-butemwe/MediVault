@@ -7,6 +7,7 @@ import { prisma } from '@/src/lib/prisma'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 import { CreatePrescriptionSchema } from '@/src/lib/validators'
 import { getRoleAndActor } from '@/src/lib/auth'
+import { notifyRole } from '@/src/lib/notifications'
 
 export async function GET(request: NextRequest) {
   const { role, actorId } = await getRoleAndActor(request)
@@ -88,6 +89,14 @@ export async function POST(request: NextRequest) {
     resourceId: prescription.id,
     details: { medicationCount: medications.length },
     ...getRequestMeta(request),
+  })
+
+  // Tell the pharmacy there is a new prescription waiting
+  await notifyRole('PHARMACIST', {
+    type: 'PRESCRIPTION_NEW',
+    title: 'New prescription to dispense',
+    body: `For ${prescription.patient.fullName}`,
+    link: '/dashboard/pharmacy#prescriptions',
   })
 
   return NextResponse.json({ success: true, data: prescription }, { status: 201 })

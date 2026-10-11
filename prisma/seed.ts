@@ -535,6 +535,54 @@ console.log('✅ Created pharmacist:', pharmacist.email)
     console.log('✅ Created sample lab orders')
   }
 
+  // ─── Sample appointment requests, messages and notifications ─────────────
+  // (only if there are none yet, so running the seed twice never duplicates them)
+  if ((await prisma.appointmentRequest.count()) === 0) {
+    const daysFromNow = (n: number) => {
+      const date = new Date()
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() + n)
+      return date
+    }
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 60 * 60 * 1000)
+
+    // Two requests waiting for reception, and one that was already declined
+    await prisma.appointmentRequest.createMany({
+      data: [
+        { patientId: patient2.id, preferredDate: daysFromNow(3), reason: 'Follow-up after malaria test' },
+        { patientId: patient4.id, preferredDate: daysFromNow(5), reason: 'Medical certificate for sports team' },
+        {
+          patientId: patient1.id, preferredDate: daysFromNow(1), reason: 'Check my iron levels',
+          status: 'DECLINED', handledById: receptionist.id, handledAt: hoursAgo(5),
+          responseNote: 'No doctor available that day. Please request a date later in the week.',
+        },
+      ],
+    })
+
+    // A conversation between Patient 1 and Dr. Mwanza (the doctor's reply is still unread),
+    // plus an unread message from Patient 3 waiting in the doctor's inbox
+    await prisma.message.createMany({
+      data: [
+        { patientId: patient1.id, doctorId: doctor1.id, senderId: patient1.id, body: 'Good day doctor. Should I take the iron tablets before or after meals?', createdAt: hoursAgo(26), readAt: hoursAgo(24) },
+        { patientId: patient1.id, doctorId: doctor1.id, senderId: doctor1.id, body: 'Take them after a meal to avoid stomach upset, and avoid tea within an hour of taking them.', createdAt: hoursAgo(22) },
+        { patientId: patient3.id, doctorId: doctor1.id, senderId: patient3.id, body: 'Doctor, I am still very thirsty today. Should I come in earlier than planned?', createdAt: hoursAgo(2) },
+      ],
+    })
+
+    await prisma.notification.createMany({
+      data: [
+        { userId: patient1.id, type: 'LAB_RESULT_READY', title: 'Your lab results are ready', body: 'Mild anaemia. Start iron supplements and recheck in 4 weeks.', link: '/dashboard/patient#labs', createdAt: hoursAgo(23) },
+        { userId: patient1.id, type: 'APPOINTMENT_DECLINED', title: 'Appointment request declined', body: 'No doctor available that day. Please request a date later in the week.', link: '/dashboard/patient#appointments', createdAt: hoursAgo(5) },
+        { userId: patient1.id, type: 'NEW_MESSAGE', title: 'New message', body: `From ${doctor1.fullName}`, link: '/dashboard/patient#messages', createdAt: hoursAgo(22) },
+        { userId: doctor1.id, type: 'LAB_CRITICAL', title: 'Critical lab result to review', body: patient3.fullName, link: '/dashboard/doctor#labs', createdAt: hoursAgo(3) },
+        { userId: doctor1.id, type: 'NEW_MESSAGE', title: 'New message', body: `From ${patient3.fullName}`, link: '/dashboard/doctor#messages', createdAt: hoursAgo(2) },
+        { userId: receptionist.id, type: 'APPOINTMENT_REQUESTED', title: 'New appointment request', body: `${patient2.fullName}: Follow-up after malaria test`, link: '/dashboard/receptionist#requests', createdAt: hoursAgo(4) },
+        { userId: receptionist.id, type: 'APPOINTMENT_REQUESTED', title: 'New appointment request', body: `${patient4.fullName}: Medical certificate for sports team`, link: '/dashboard/receptionist#requests', createdAt: hoursAgo(1) },
+      ],
+    })
+    console.log('✅ Created sample appointment requests, messages and notifications')
+  }
+
   console.log('\n🎉 Seeding complete!')
   console.log('\nDemo login credentials (all passwords: password123):')
   console.log('  Admin:        admin@unza.zm')

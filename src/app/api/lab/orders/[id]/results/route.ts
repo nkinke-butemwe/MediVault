@@ -10,6 +10,7 @@ import { getRoleAndActor } from '@/src/lib/auth'
 import { EnterLabResultsSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 import { LAB_ORDER_INCLUDE } from '@/src/lib/lab-include'
+import { notifyUser } from '@/src/lib/notifications'
 import { computeFlag, canEnterResults, isCriticalFlag, parseAllowedResults } from '@/src/lib/lab'
 
 export async function PUT(
@@ -112,6 +113,17 @@ export async function PUT(
     },
     ...getRequestMeta(request),
   })
+
+  // When the last result is in, the ordering doctor has something to review
+  if (updated.status === 'COMPLETED') {
+    const hasCritical = prepared.some((p) => p.critical)
+    await notifyUser(order.orderedById, {
+      type: hasCritical ? 'LAB_CRITICAL' : 'LAB_COMPLETED',
+      title: hasCritical ? 'Critical lab result to review' : 'Lab results ready for review',
+      body: `${updated.patient.fullName}`,
+      link: '/dashboard/doctor#labs',
+    })
+  }
 
   return NextResponse.json({ success: true, data: updated })
 }

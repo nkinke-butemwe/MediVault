@@ -10,6 +10,7 @@ import { getRoleAndActor } from '@/src/lib/auth'
 import { LabOrderActionSchema } from '@/src/lib/validators'
 import { logAccess, getRequestMeta } from '@/src/lib/logger'
 import { LAB_ORDER_INCLUDE } from '@/src/lib/lab-include'
+import { notifyUser } from '@/src/lib/notifications'
 
 export async function PATCH(
   request: NextRequest,
@@ -78,6 +79,16 @@ export async function PATCH(
     details: { action: body.action },
     ...getRequestMeta(request),
   })
+
+  // Releasing results is the moment the patient can finally see them, so tell them
+  if (body.action === 'review') {
+    await notifyUser(order.patientId, {
+      type: 'LAB_RESULT_READY',
+      title: 'Your lab results are ready',
+      body: body.doctorComment || null,
+      link: '/dashboard/patient#labs',
+    })
+  }
 
   const updated = await prisma.labOrder.findUnique({ where: { id: params.id }, include: LAB_ORDER_INCLUDE })
   return NextResponse.json({ success: true, data: updated })

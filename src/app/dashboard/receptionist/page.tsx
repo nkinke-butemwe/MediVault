@@ -8,6 +8,7 @@ import { useAuth } from '@/src/hooks/useAuth'
 import { useHashSection } from '@/src/hooks/useHashSection'
 import toast from 'react-hot-toast'
 import type { Visit } from '@/src/types'
+import AppointmentRequestsPanel from '@/src/components/receptionist/AppointmentRequestsPanel'
 import {
   SearchIcon,
   CalendarIcon,
@@ -17,6 +18,7 @@ import {
   XCircleIcon,
   RefreshIcon,
   PlusIcon,
+  ClipboardListIcon,
 } from '@/src/components/icons'
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ interface VerificationResult {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const RECEPTIONIST_SECTIONS = ['verify', 'visits', 'register'] as const
+const RECEPTIONIST_SECTIONS = ['verify', 'visits', 'requests', 'register'] as const
 
 export default function ReceptionistDashboard() {
   const { user } = useAuth()
@@ -248,10 +250,16 @@ export default function ReceptionistDashboard() {
 
       {/* Section tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(['verify', 'visits', 'register'] as const).map((s) => {
+        {(['verify', 'visits', 'requests', 'register'] as const).map((s) => {
           // Pick which icon and label go with each tab
-          const TabIcon = s === 'verify' ? SearchIcon : s === 'visits' ? CalendarIcon : UserPlusIcon
-          const tabLabel = s === 'verify' ? 'Verify Student' : s === 'visits' ? "Today's Visits" : 'Register Patient'
+          const tabStyles = {
+            verify: { icon: SearchIcon, label: 'Verify Student' },
+            visits: { icon: CalendarIcon, label: "Today's Visits" },
+            requests: { icon: ClipboardListIcon, label: 'Appointment Requests' },
+            register: { icon: UserPlusIcon, label: 'Register Patient' },
+          }
+          const TabIcon = tabStyles[s].icon
+          const tabLabel = tabStyles[s].label
           return (
             <button
               key={s}
@@ -268,6 +276,10 @@ export default function ReceptionistDashboard() {
           )
         })}
       </div>
+
+      {/* ── Appointment Requests Panel ──────────────────────────────────── */}
+      {/* A confirmed request creates a visit, so refresh today's list afterwards */}
+      {activeSection === 'requests' && <AppointmentRequestsPanel onChanged={fetchTodayVisits} />}
 
       {/* ── Student Verification Panel ──────────────────────────────────── */}
       {activeSection === 'verify' && (

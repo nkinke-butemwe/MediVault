@@ -17,6 +17,62 @@ should not be edited once later versions exist.
 
 ## [Unreleased]
 
+### Added
+
+Patient engagement features, drawn from what comparable portals (Epic MyChart,
+campus health portals such as MyUCBerkeleyHealth, OpenEMR, Bahmni) offer and
+MediVault lacked: the patient was only a record that staff looked at, not a
+participant. Needs `npx prisma migrate dev` (new migration
+`20261011090000_add_patient_engagement`) and, for demo data, `npm run db:seed`.
+
+- **Appointment requests.** A patient asks for a date and gives a reason
+  (Patient dashboard → *Appointments*). Reception sees the queue under
+  *Appointment Requests*, and either confirms a date/time (this creates the
+  `Visit` in the same database transaction and notifies the patient) or
+  declines with a reason the patient reads. Patients can cancel a request
+  (a confirmed one also cancels its still-waiting visit). Rules enforced on
+  the server: dates cannot be in the past or more than 90 days ahead, a
+  patient can have at most 3 open requests, and a request can only be
+  answered once (guarded update, `409` otherwise).
+  New: `AppointmentRequest` model, `/api/appointment-requests` and
+  `/api/appointment-requests/[id]`, `src/lib/appointments.ts`.
+- **In-app notifications.** A bell in the dashboard header for every role,
+  with an unread count, "mark all read", and click-through to the right
+  section. Created automatically when: a patient requests an appointment
+  (reception), a request is confirmed or declined (patient), a prescription is
+  issued (pharmacists), dispensed (patient), lab results are complete
+  (ordering doctor, flagged *critical* if any value is) and when the doctor
+  releases lab results (patient). Notifications never throw: a failure to
+  save one cannot undo the action that caused it.
+  New: `Notification` model, `/api/notifications`, `src/lib/notifications.ts`,
+  `src/components/NotificationBell.tsx`.
+- **Care timeline.** One chronological list of a patient's medical records,
+  visits, prescriptions, released lab results and appointment requests, with
+  filters. Doctors can open the same view for a selected patient (logged in the
+  access log). Lab results appear only after the doctor has released them, the
+  same rule as the Lab Results page. New: `/api/timeline`, `src/lib/timeline.ts`,
+  `src/components/patient/TimelineView.tsx`.
+- **Secure patient–doctor messaging.** A patient can message only doctors on
+  their care team (a doctor who has written their record, prescribed to them or
+  ordered their labs); a doctor can message only their own patients. Receptionists,
+  pharmacists and the rest cannot use it. Opening a thread as a doctor is written
+  to the access log. Notifications say who wrote, never what was written.
+  New: `Message` model, `/api/messages`, `src/lib/care-team.ts`,
+  `src/components/messages/MessagesPanel.tsx`.
+- Demo seed data for all of the above (pending requests, a declined request,
+  a conversation with an unread reply, unread notifications).
+- 4 new icons (`BellIcon`, `MessageIcon`, `SendIcon`, `ActivityIcon`).
+- 45 new tests (plus 4 icon tests): date rules, timeline building (including the lab-review rule and
+  duplicate removal), validators, and who-may-do-what for every new route.
+
+### Fixed
+
+- **Dispensing a prescription could not work on Linux/macOS.** The folder was
+  named `src/app/api/prescriptions/[Id]/` (capital I) but the route reads
+  `params.id`, so on a case-sensitive file system `params.id` was `undefined`.
+  Windows ignores letter case, which is why it worked there. Renamed to
+  `[id]`, which is what the file's own comment and the route-safety test expect.
+
 ### Security
 
 - **Anyone could log in as any user by writing their own cookie.** The

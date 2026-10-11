@@ -87,5 +87,9 @@ export const config = {
     '/api/prescriptions/:path*',
     '/api/pharmacy/:path*',
     '/api/lab/:path*',
+    '/api/appointment-requests/:path*',
+    '/api/notifications/:path*',
+    '/api/messages/:path*',
+    '/api/timeline/:path*',
   ],
 }
