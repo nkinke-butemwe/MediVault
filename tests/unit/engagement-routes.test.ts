@@ -20,6 +20,7 @@ const db = vi.hoisted(() => ({
   appointmentRequest: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   notification: { findMany: vi.fn(), count: vi.fn(), updateMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
   accessLog: { create: vi.fn() },
+  admission: { findMany: vi.fn() },
 }))
 vi.mock('@/src/lib/prisma', () => ({ prisma: db }))
 
@@ -67,6 +68,8 @@ beforeEach(() => {
   db.notification.create.mockResolvedValue({})
   db.notification.createMany.mockResolvedValue({ count: 0 })
   db.user.findMany.mockResolvedValue([])
+  // No admissions unless a test says otherwise (care team and timeline both read them)
+  db.admission.findMany.mockResolvedValue([])
 })
 
 describe('messages: who may use them', () => {

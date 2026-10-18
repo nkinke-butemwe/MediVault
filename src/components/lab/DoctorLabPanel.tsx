@@ -15,9 +15,11 @@ import { formatReferenceRange } from '@/src/lib/lab'
 interface DoctorLabPanelProps {
   patientId: string
   patientName: string
+  // Set when the tests are ordered from an inpatient admission, so the order is linked to that stay
+  admissionId?: string
 }
 
-export default function DoctorLabPanel({ patientId, patientName }: DoctorLabPanelProps) {
+export default function DoctorLabPanel({ patientId, patientName, admissionId }: DoctorLabPanelProps) {
   const [catalogue, setCatalogue] = useState<LabTestInfo[]>([])
   const [orders, setOrders] = useState<LabOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,7 +71,7 @@ export default function DoctorLabPanel({ patientId, patientName }: DoctorLabPane
       const res = await fetch('/api/lab/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientId, testIds: selected, priority, clinicalNotes: clinicalNotes || null }),
+        body: JSON.stringify({ patientId, testIds: selected, priority, clinicalNotes: clinicalNotes || null, admissionId }),
       })
       const data = await res.json()
       if (data.success) {

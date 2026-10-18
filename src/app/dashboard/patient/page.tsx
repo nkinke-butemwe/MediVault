@@ -14,6 +14,7 @@ import LabOrderCard from '@/src/components/lab/LabOrderCard'
 import TimelineView from '@/src/components/patient/TimelineView'
 import AppointmentsPanel from '@/src/components/patient/AppointmentsPanel'
 import MessagesPanel from '@/src/components/messages/MessagesPanel'
+import AdmissionHistory from '@/src/components/admissions/AdmissionHistory'
 import {
   FileTextIcon,
   CalendarIcon,
@@ -81,7 +82,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const PATIENT_SECTIONS = ['overview', 'timeline', 'records', 'visits', 'appointments', 'labs', 'messages', 'kin', 'logs'] as const
+const PATIENT_SECTIONS = ['overview', 'timeline', 'records', 'visits', 'appointments', 'labs', 'admissions', 'messages', 'kin', 'logs'] as const
 
 export default function PatientDashboard() {
   const { user, loading: authLoading } = useAuth()
@@ -247,6 +248,9 @@ export default function PatientDashboard() {
       {/* ── Appointments Section ──────────────────────────────────────── */}
       {/* After a request changes, reload the page data so "My Visits" stays current */}
       {activeSection === 'appointments' && <AppointmentsPanel onChanged={fetchData} />}
+
+      {/* ── My Admissions Section (read-only) ─────────────────────────── */}
+      {activeSection === 'admissions' && user && <AdmissionHistory patientId={user.id} />}
 
       {/* ── Messages Section ──────────────────────────────────────────── */}
       {activeSection === 'messages' && user && <MessagesPanel viewerRole="PATIENT" viewerId={user.id} />}

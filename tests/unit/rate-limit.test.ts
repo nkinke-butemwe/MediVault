@@ -59,4 +59,17 @@ describe('checkRateLimit', () => {
     const second = checkRateLimit(key)
     expect(second.remainingAttempts).toBe(3)
   })
+
+  it('accepts custom limits for other endpoints', () => {
+    const key = 'test-ip-5'
+    const limits = { maxAttempts: 2, windowMs: 60 * 1000 }
+
+    expect(checkRateLimit(key, limits).allowed).toBe(true)
+    expect(checkRateLimit(key, limits).allowed).toBe(true)
+
+    // The 3rd attempt is over the custom limit of 2
+    const third = checkRateLimit(key, limits)
+    expect(third.allowed).toBe(false)
+    expect(third.retryAfterSeconds).toBeLessThanOrEqual(60)
+  })
 })

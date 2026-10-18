@@ -18,11 +18,13 @@ import {
   FlaskIcon,
   MessageIcon,
   ActivityIcon,
+  HospitalIcon,
 } from '@/src/components/icons'
 import { formatDate } from '@/src/lib/format'
 import DoctorLabPanel from '@/src/components/lab/DoctorLabPanel'
 import MessagesPanel from '@/src/components/messages/MessagesPanel'
 import TimelineView from '@/src/components/patient/TimelineView'
+import DoctorAdmissionsPanel from '@/src/components/admissions/DoctorAdmissionsPanel'
 
 interface PatientSearchResult {
   id: string
@@ -49,7 +51,7 @@ function VisitStatusBadge({ status }: { status: string }) {
 }
 
 // Sections this page can show. Must match the #hash values used in the sidebar.
-const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe', 'labs', 'timeline', 'messages'] as const
+const DOCTOR_SECTIONS = ['search', 'add-record', 'prescribe', 'labs', 'timeline', 'admissions', 'messages'] as const
 
 export default function DoctorDashboard() {
   const { user } = useAuth()
@@ -66,9 +68,14 @@ export default function DoctorDashboard() {
   // "Add record" and "Prescribe" only make sense once a patient is selected,
   // so without a patient we always fall back to showing the search section.
   // The inbox ("messages") works without a selected patient, so it is allowed through.
-  const activeSection =
-    requestedSection === 'messages' ? 'messages' : !selectedPatient ? 'search' : requestedSection
-  const needsPatientFirst = !selectedPatient && requestedSection !== 'search' && requestedSection !== 'messages'
+  // The admissions list works without a selected patient too (it has its own search box).
+  const sectionsWithoutPatient = ['search', 'messages', 'admissions']
+  const activeSection = sectionsWithoutPatient.includes(requestedSection)
+    ? requestedSection
+    : !selectedPatient
+    ? 'search'
+    : requestedSection
+  const needsPatientFirst = !selectedPatient && !sectionsWithoutPatient.includes(requestedSection)
   const [newRecord, setNewRecord] = useState({ diagnosis: '', allergies: '', notes: '', followUpDate: '' })
   const [medications, setMedications] = useState<Medication[]>([{ name: '', dose: '', duration: '' }])
   const [savingRecord, setSavingRecord] = useState(false)
@@ -226,6 +233,10 @@ export default function DoctorDashboard() {
         <button onClick={() => { if (!selectedPatient) { toast.error('Please select a patient first'); return } setActiveSection('timeline') }}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'timeline' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
           <ActivityIcon size={16} /> Timeline
+        </button>
+        <button onClick={() => setActiveSection('admissions')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'admissions' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
+          <HospitalIcon size={16} /> Admissions
         </button>
         <button onClick={() => setActiveSection('messages')}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${activeSection === 'messages' ? 'bg-[#0f3b5c] text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}>
@@ -565,6 +576,9 @@ export default function DoctorDashboard() {
           <TimelineView patientId={selectedPatient.id} />
         </div>
       )}
+
+      {/* Admissions: current inpatients, admit / discharge, notes and vitals */}
+      {activeSection === 'admissions' && user && <DoctorAdmissionsPanel viewerRole={user.role} />}
 
       {/* Messages: the doctor's inbox. If a patient is selected, they can be messaged from here too. */}
       {activeSection === 'messages' && user && (

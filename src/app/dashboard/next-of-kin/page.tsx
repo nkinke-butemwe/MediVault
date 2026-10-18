@@ -16,6 +16,7 @@ import {
   ChevronDownIcon,
 } from '@/src/components/icons'
 import { formatDate } from '@/src/lib/format'
+import KinAdmissionStatus from '@/src/components/admissions/KinAdmissionStatus'
 
 export default function NextOfKinDashboard() {
   const { user } = useAuth()
@@ -104,6 +105,9 @@ export default function NextOfKinDashboard() {
           Welcome, {user?.fullName} · You are registered as next of kin for {assignments.length} patient{assignments.length !== 1 ? 's' : ''}.
         </p>
       </div>
+
+      {/* Admitted / discharged status of the patients who have given consent (hidden when there is nothing to show) */}
+      <KinAdmissionStatus />
 
       {assignments.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm p-12 text-center">

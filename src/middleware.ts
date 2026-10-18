@@ -91,5 +91,8 @@ export const config = {
     '/api/notifications/:path*',
     '/api/messages/:path*',
     '/api/timeline/:path*',
+    '/api/admissions/:path*',
+    '/api/wards/:path*',
+    '/api/beds/:path*',
   ],
 }

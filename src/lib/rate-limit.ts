@@ -16,14 +16,23 @@ const rateLimitStore = new Map<string, RateLimitEntry>()
 const MAX_ATTEMPTS = 5           // Maximum allowed attempts in the window
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes in milliseconds
 
+// Optional custom limits. Without them, the login defaults above are used.
+// Other endpoints (for example student verification) pass their own numbers.
+export interface RateLimitOptions {
+  maxAttempts?: number // allowed attempts per window
+  windowMs?: number    // window length in milliseconds
+}
+
 // Checks if a given key (usually an IP address) has exceeded the rate limit.
 // Returns { allowed: true } if the request can proceed,
 // or { allowed: false, retryAfterSeconds } if the limit is exceeded.
-export function checkRateLimit(key: string): {
+export function checkRateLimit(key: string, options: RateLimitOptions = {}): {
   allowed: boolean
   remainingAttempts?: number
   retryAfterSeconds?: number
 } {
+  const maxAttempts = options.maxAttempts ?? MAX_ATTEMPTS
+  const windowMs = options.windowMs ?? WINDOW_MS
   const now = Date.now()
   const entry = rateLimitStore.get(key)
 
@@ -31,12 +40,12 @@ export function checkRateLimit(key: string): {
     // No previous attempts, or the window has expired — start a fresh window
     rateLimitStore.set(key, {
       attempts: 1,
-      resetAt: now + WINDOW_MS,
+      resetAt: now + windowMs,
     })
-    return { allowed: true, remainingAttempts: MAX_ATTEMPTS - 1 }
+    return { allowed: true, remainingAttempts: maxAttempts - 1 }
   }
 
-  if (entry.attempts >= MAX_ATTEMPTS) {
+  if (entry.attempts >= maxAttempts) {
     // Limit exceeded — tell the client how long to wait
     const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000)
     return { allowed: false, retryAfterSeconds }
@@ -46,7 +55,7 @@ export function checkRateLimit(key: string): {
   entry.attempts += 1
   rateLimitStore.set(key, entry)
 
-  return { allowed: true, remainingAttempts: MAX_ATTEMPTS - entry.attempts }
+  return { allowed: true, remainingAttempts: maxAttempts - entry.attempts }
 }
 
 // Cleans up expired entries to prevent memory leaks.

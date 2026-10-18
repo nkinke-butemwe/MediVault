@@ -6,7 +6,11 @@
 // We set JWT_SECRET before any test runs, because signToken/verifyToken
 // read it from process.env at call time and will throw if it's missing.
 
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
+
+// auth.ts imports the database client; these tests never touch the database,
+// so we swap it for an empty fake.
+vi.mock('@/src/lib/prisma', () => ({ prisma: {} }))
 
 beforeAll(() => {
   process.env.JWT_SECRET = 'test-only-secret-do-not-use-in-production'

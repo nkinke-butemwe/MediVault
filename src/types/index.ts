@@ -265,3 +265,85 @@ export interface PaginatedResponse<T> {
   pageSize: number
   totalPages: number
 }
+
+// ─── Inpatient admissions ─────────────────────────────────────────────────
+
+export type AdmissionStatus = 'ADMITTED' | 'DISCHARGED' | 'CANCELLED'
+export type AdmissionPriority = 'EMERGENCY' | 'URGENT' | 'ROUTINE'
+export type AdmissionSource = 'WALK_IN' | 'APPOINTMENT' | 'REFERRAL' | 'TRANSFER_IN' | 'EMERGENCY'
+export type DischargeDisposition = 'HOME' | 'TRANSFERRED_OUT' | 'LEFT_AGAINST_ADVICE' | 'DECEASED'
+export type AdmissionNoteKind = 'PROGRESS' | 'WARD_ROUND' | 'PROCEDURE' | 'DIAGNOSIS_UPDATE'
+
+export interface AdmissionNote {
+  id: string
+  kind: AdmissionNoteKind
+  body: string
+  createdAt: string
+  author: { id: string; fullName: string }
+}
+
+export interface VitalsReading {
+  id: string
+  temperature: number | null
+  pulse: number | null
+  systolic: number | null
+  diastolic: number | null
+  respRate: number | null
+  spo2: number | null
+  weightKg: number | null
+  recordedAt: string
+  recordedBy: { id: string; fullName: string }
+}
+
+// One admission as the API sends it. Which fields are present depends on the viewer's role
+// (see src/lib/admission-views.ts), so everything except the basics is optional here.
+export interface Admission {
+  id: string
+  admissionNumber: string
+  status: AdmissionStatus
+  admittedAt: string
+  dischargedAt: string | null
+  lengthOfStayDays: number | null
+  patient?: { id: string; fullName: string; studentNumber?: string | null } | null
+  attendingDoctor?: { id: string; fullName: string } | null
+  admittingDoctor?: { id: string; fullName: string } | null
+  priority?: AdmissionPriority
+  source?: AdmissionSource
+  referralFrom?: string | null
+  presentingComplaint?: string
+  reason?: string
+  provisionalDiagnosis?: string | null
+  admissionNotes?: string | null
+  examinationFindings?: string | null
+  knownAllergies?: string | null
+  existingConditions?: string | null
+  currentMedication?: string | null
+  expectedDischargeAt?: string | null
+  consentBy?: 'PATIENT' | 'NEXT_OF_KIN'
+  cancelReason?: string | null
+  cancelledAt?: string | null
+  dischargeDisposition?: DischargeDisposition | null
+  finalDiagnosis?: string | null
+  dischargeSummary?: string | null
+  dischargeInstructions?: string | null
+  followUpDate?: string | null
+  transferDestination?: string | null
+  timeOfDeath?: string | null
+  causeOfDeath?: string | null
+  // Only in the full clinical view of ONE admission
+  notes?: AdmissionNote[]
+  vitals?: VitalsReading[]
+  labOrders?: { id: string; status: string; priority: string; createdAt: string; reviewedAt: string | null }[]
+  prescriptions?: { id: string; status: string; medications: string; createdAt: string }[]
+  // Only in a patient's history
+  isReadmission?: boolean
+}
+
+export interface AdmissionStats {
+  currentAdmissions: number
+  dischargesToday: number
+  completedAdmissions: number
+  averageLengthOfStayDays: number
+  readmissionCount: number
+  windowDays: number
+}

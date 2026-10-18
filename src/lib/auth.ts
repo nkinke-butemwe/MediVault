@@ -4,6 +4,7 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { JWTPayload, Role } from '@/src/types'
+import { prisma } from '@/src/lib/prisma'
 import {
   AUTH_COOKIE_NAME,
   SESSION_DURATION_SECONDS,
@@ -38,13 +39,26 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
 // trust x-user-* request headers (a client can send any header it likes) and
 // never decodes the token without verifying it.
 //
-// Not logged in / forged / expired token  ->  { role: null, actorId: 'system' }
+// It also looks the user up in the database (one query by primary key) so that
+// a deactivated or deleted account stops working straight away, instead of
+// keeping a valid session until the token expires.
+//
+// Not logged in / forged / expired token / deactivated or missing user
+//   ->  { role: null, actorId: 'system' }
 // so every route's existing "is this role allowed?" check simply says no.
 export async function getRoleAndActor(
   request: NextRequest
 ): Promise<{ role: Role | null; actorId: string }> {
   const user = await getTokenFromRequest(request)
   if (!user) return { role: null, actorId: 'system' }
+
+  // The token is genuine, but the account may have been deactivated since login
+  const account = await prisma.user.findUnique({
+    where: { id: user.userId },
+    select: { isActive: true },
+  })
+  if (!account || !account.isActive) return { role: null, actorId: 'system' }
+
   return { role: user.role, actorId: user.userId }
 }
 

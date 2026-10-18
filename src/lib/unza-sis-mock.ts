@@ -25,14 +25,14 @@ const MOCK_SIS_DATABASE: Record<string, SISStudent> = {
 
 export function queryUNZASIS(studentNumber: string): 
   | { found: false }
-  | { found: true; eligible: false; reason: string }
+  | { found: true; eligible: false; reason: string; outcome: 'SUSPENDED' | 'ALUMNUS' }
   | { found: true; eligible: true; student: SISStudent } 
 {
   const student = MOCK_SIS_DATABASE[studentNumber.trim()]
 
   if (!student) return { found: false }
-  if (student.status === 'suspended') return { found: true, eligible: false, reason: 'Student account is suspended. Contact the Registrar.' }
-  if (student.status === 'alumni')    return { found: true, eligible: false, reason: 'This student number belongs to an alumnus.' }
+  if (student.status === 'suspended') return { found: true, eligible: false, reason: 'Student account is suspended. Contact the Registrar.', outcome: 'SUSPENDED' }
+  if (student.status === 'alumni')    return { found: true, eligible: false, reason: 'This student number belongs to an alumnus.', outcome: 'ALUMNUS' }
 
   return { found: true, eligible: true, student }
 }

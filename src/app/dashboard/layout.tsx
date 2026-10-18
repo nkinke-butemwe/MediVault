@@ -30,6 +30,7 @@ import {
   FlaskIcon,
   ActivityIcon,
   MessageIcon,
+  HospitalIcon,
   type IconProps,
 } from '@/src/components/icons'
 
@@ -41,6 +42,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'My Visits', href: '/dashboard/patient#visits', icon: CalendarIcon },
     { label: 'Appointments', href: '/dashboard/patient#appointments', icon: CalendarIcon },
     { label: 'Lab Results', href: '/dashboard/patient#labs', icon: FlaskIcon },
+    { label: 'My Admissions', href: '/dashboard/patient#admissions', icon: HospitalIcon },
     { label: 'Messages', href: '/dashboard/patient#messages', icon: MessageIcon },
     { label: 'Next of Kin', href: '/dashboard/patient#kin', icon: HeartIcon },
     { label: 'Access Logs', href: '/dashboard/patient#logs', icon: ClipboardListIcon },
@@ -57,6 +59,7 @@ const NAV_ITEMS: Record<Role, { label: string; href: string; icon: ComponentType
     { label: 'Patient Search', href: '/dashboard/doctor#search', icon: SearchIcon },
     { label: 'Add Record', href: '/dashboard/doctor#add-record', icon: ClipboardIcon },
     { label: 'Lab Tests', href: '/dashboard/doctor#labs', icon: FlaskIcon },
+    { label: 'Admissions', href: '/dashboard/doctor#admissions', icon: HospitalIcon },
     { label: 'Messages', href: '/dashboard/doctor#messages', icon: MessageIcon },
   ],
   ADMIN: [

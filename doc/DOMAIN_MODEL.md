@@ -27,6 +27,44 @@ It was reverse-engineered from `prisma/schema.prisma` plus the business rules in
 
 ![Laboratory](domain-model-4-laboratory.png)
 
+## View 5: Inpatient admissions
+
+Source (Mermaid, renders on GitHub and in most Markdown viewers). The `.png`/`.svg` for the other four views are generated with `mmdc`; this view is kept as source only until it is regenerated the same way.
+
+```mermaid
+classDiagram
+  class User
+  class Admission {
+    admissionNumber
+    priority
+    source
+    presentingComplaint
+    reason
+    admittedAt
+    consentBy
+    status
+    dischargedAt
+    dischargeDisposition
+    finalDiagnosis
+  }
+  class AdmissionNote { kind, body, createdAt }
+  class VitalsReading { temperature, pulse, systolic, diastolic, respRate, spo2, weightKg, recordedAt }
+  class AdmissionCounter { year, lastNumber }
+  class NextOfKinAssignment
+  class LabOrder
+  class Prescription
+  class MedicalRecord
+  User "1" --> "*" Admission : patient
+  User "1" --> "*" Admission : admitting doctor
+  User "1" --> "*" Admission : attending doctor
+  Admission "1" --> "*" AdmissionNote
+  Admission "1" --> "*" VitalsReading
+  Admission "0..1" <-- "*" LabOrder : optional admissionId
+  Admission "0..1" <-- "*" Prescription : optional admissionId
+  Admission "0..1" <-- "*" MedicalRecord : optional admissionId
+  Admission "*" ..> "0..1" NextOfKinAssignment : consentKinAssignmentId (by value)
+```
+
 ---
 
 ## Entity catalogue
@@ -77,6 +115,15 @@ It was reverse-engineered from `prisma/schema.prisma` plus the business rules in
 | **LabOrder** | A doctor's request for one or more tests for a patient. Tracks who collected, completed and reviewed it. | `priority` (`LabPriority`), `status` (`LabOrderStatus`), `clinicalNotes`, `collectedAt`, `completedAt`, `reviewedAt`, `doctorComment`; links to patient, ordering doctor, and optional collector, completer, reviewer |
 | **LabOrderItem** | One test inside an order, plus its result once the lab has run it. Owned by the order (deleted with it). | `unit`, `refLow`, `refHigh`, `criticalLow`, `criticalHigh`, `normalText`, `valueNumeric`, `valueText`, `flag` (`LabFlag`), `notes`, `resultAt`. Unique per (order, test). |
 
+### Inpatient admissions
+
+| Entity | Purpose | Attributes |
+| --- | --- | --- |
+| **Admission** | One inpatient stay or short-stay observation under a doctor. A patient may have many, but at most one with status `ADMITTED` (partial unique index `one_active_admission_per_patient`). | `admissionNumber` (unique, `ADM-year-000123`), `priority`, `source`, `referralFrom`, `presentingComplaint`, `reason`, `provisionalDiagnosis`, `admissionNotes`, `examinationFindings`, `knownAllergies`, `existingConditions`, `currentMedication`, `admittedAt`, `expectedDischargeAt`, `consentBy`, `consentKinAssignmentId`, `status`, cancellation fields (`cancelReason`, `cancelledAt`, `cancelledById`), discharge fields (`dischargedAt`, `dischargedById`, `dischargeDisposition`, `finalDiagnosis`, `dischargeSummary`, `dischargeInstructions`, `followUpDate`, `transferDestination`, `timeOfDeath`, `causeOfDeath`); links to the patient, admitting doctor, attending doctor, and optional visit (by value) |
+| **AdmissionNote** | A note written during the stay. Append-only: no edit or delete. | `kind` (`AdmissionNoteKind`), `body`, `createdAt`; links to the admission and the author |
+| **VitalsReading** | One structured set of observations during the stay. Separate from the free-text `Visit.vitals`. | `temperature`, `pulse`, `systolic`, `diastolic`, `respRate`, `spo2`, `weightKg`, `recordedAt`; links to the admission and who recorded it |
+| **AdmissionCounter** | One row per year used to hand out admission numbers race-safely inside the creating transaction. | `year`, `lastNumber` |
+
 ### External concept (not stored)
 
 **SIS student record.** Student verification calls `queryUNZASIS()` in `src/lib/unza-sis-mock.ts`, which looks up a student number in a hard-coded mock and returns `studentNumber`, `fullName`, `programme`, `year`, `faculty`, `status` (`registered`, `suspended`, `alumni`), `dob`, `gender`. It is a lookup result, not a database entity, and it is linked to a Patient only by matching `studentNumber`. Only `registered` students are eligible. The code comment says to replace it with a real call to the UNZA SIS in production.
@@ -92,6 +139,11 @@ It was reverse-engineered from `prisma/schema.prisma` plus the business rules in
 | LabPriority | ROUTINE, URGENT |
 | LabFlag | NORMAL, LOW, HIGH, CRITICAL_LOW, CRITICAL_HIGH, ABNORMAL |
 | AppointmentStatus | REQUESTED, CONFIRMED, DECLINED, CANCELLED |
+| AdmissionStatus | ADMITTED, DISCHARGED, CANCELLED |
+| AdmissionPriority | EMERGENCY, URGENT, ROUTINE |
+| AdmissionSource | WALK_IN, APPOINTMENT, REFERRAL, TRANSFER_IN, EMERGENCY |
+| DischargeDisposition | HOME, TRANSFERRED_OUT, LEFT_AGAINST_ADVICE, DECEASED |
+| AdmissionNoteKind | PROGRESS, WARD_ROUND, PROCEDURE, DIAGNOSIS_UPDATE |
 
 ## Business rules the model depends on
 
@@ -105,6 +157,11 @@ These live in code, not in the schema, so they are easy to miss.
 6. **Confirming an appointment creates a visit.** `AppointmentRequest.visitId` stores the new visit's id as a plain value (no relation), so a visit can be removed without breaking request history.
 7. **Who may create visits.** The visits route allows receptionist, doctor and admin, which is why `Visit.createdBy` is drawn as `User`.
 8. **Message sender.** A message's sender must be the thread's patient or doctor (schema comment; enforced by application code, not by the database).
+9. **Admission lifecycle.** `ADMITTED` becomes `DISCHARGED` or `CANCELLED` and never goes back (`canTransition` in `src/lib/admissions.ts`). A second discharge or cancel is a `409`. Each discharge outcome has its own required fields, and only a doctor may record a death (`validateDischarge`, `canUseDisposition`).
+10. **Admission numbers.** Generated from `AdmissionCounter` inside the same transaction that creates the admission, so they are unique and gap-free (a rolled-back admission rolls back its number).
+11. **Admission consent.** `consentBy` is `PATIENT` or `NEXT_OF_KIN`. For `NEXT_OF_KIN`, `consentKinAssignmentId` must point to an assignment that is active with `emergencyConsentGiven`. It is checked by the route when the admission is made, not by a foreign key.
+12. **Who sees an admission.** Doctor/admin: everything. Receptionist: census fields only. Patient: own admissions, with discharge summary and instructions. Next of kin: status and dates while the assignment is active with consent. Pharmacist and lab technician: nothing (`src/lib/admission-views.ts`).
+13. **Linked work survives discharge.** Prescriptions, lab orders, medical records, notes and vitals keep their `admissionId` after discharge. Open lab orders or undispensed prescriptions only produce warnings.
 
 ## Observations from the schema
 
@@ -112,7 +169,7 @@ Not defects, just places where the model is looser than it might look. Worth kno
 
 - **`NextOfKinAssignment` has no uniqueness rule.** Nothing in the schema stops the same patient and next of kin being assigned twice, or a patient having several active delegates.
 - **Role-specific links are not enforced by the database.** Any `User` id can be stored as a patient, doctor or pharmacist foreign key; the role is checked in the API routes instead.
-- **`MedicalRecord`, `Visit` and `LabOrder` are not linked to each other.** A prescription can point at a medical record, but a record does not point at the visit it came from, and lab orders point at neither.
+- **`MedicalRecord`, `Visit` and `LabOrder` are not linked to each other.** A prescription can point at a medical record, but a record does not point at the visit it came from, and lab orders point at neither. The one new link is the optional `admissionId` on records, prescriptions and lab orders, which ties them to an inpatient stay.
 - **Medication data exists in two shapes.** `MedicalRecord.medications` and `.allergies` are free text; `Prescription.medications` is structured JSON stored as a string.
 - **Two cross-entity links are by value, not relation.** `Prescription` to `DrugInventory` (drug name) and `AppointmentRequest.visitId` to `Visit`.
 - **Cascades.** `PatientProfile`, `Notification` and `LabOrderItem` are deleted with their owner. Other relations have no cascade, so users with history cannot simply be deleted, which fits the use of `isActive` for deactivation.
@@ -125,5 +182,6 @@ Not defects, just places where the model is looser than it might look. Worth kno
 | `domain-model-2-clinical-care.*` | Records, visits, appointment requests, messages |
 | `domain-model-3-pharmacy.*` | Prescriptions and drug inventory |
 | `domain-model-4-laboratory.*` | Lab tests, orders and results |
+| View 5 (Mermaid in this file) | Admissions, notes, vitals, counter and their links |
 
 Each has `.mmd` (source), `.svg` and `.png`. To regenerate: `mmdc -i <file>.mmd -o <file>.svg`.

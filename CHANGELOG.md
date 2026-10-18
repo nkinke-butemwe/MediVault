@@ -17,7 +17,85 @@ should not be edited once later versions exist.
 
 ## [Unreleased]
 
-### Added
+### Added: Inpatient Admissions (Phase 1)
+
+**Inpatient Admissions module, Phase 1** (admit, monitor, discharge, cancel, history).
+An admission is an inpatient stay or short-stay observation under a doctor. A patient
+may have many admissions over time, but at most ONE with status `ADMITTED`. Wards and
+beds are not part of Phase 1: admissions work fully without them.
+Needs `npx prisma migrate dev` (new migration `20261016090000_add_admissions`) and, for demo
+data, `npm run db:seed` (adds one current, one discharged and one cancelled admission).
+
+- **Admit.** A doctor admits a registered, active patient from *Doctor dashboard → Admissions*
+  (student-number lookup, complaint, reason, provisional diagnosis, priority, source, consent).
+  The server generates an admission number such as `ADM-2026-000123` from a per-year counter row
+  inside the same database transaction that creates the admission, so two requests can never get
+  the same number. Consent is given by the patient or by a next of kin; a next-of-kin consent is
+  accepted only if that assignment is active and has emergency consent on record. The patient and
+  consenting next of kin are notified. An admission created from a clinic visit closes that visit.
+- **One active admission per patient.** Enforced by the database, not just the code: a partial
+  unique index `one_active_admission_per_patient` (hand-written in the migration, because Prisma
+  cannot describe it). The route also checks first for a friendly message and turns a database
+  unique-violation (two requests at once) into `409`.
+- **Status rules.** `ADMITTED` can become `DISCHARGED` or `CANCELLED`; nothing is ever reopened.
+  Discharging or cancelling twice returns `409` and changes nothing (guarded `updateMany`).
+- **Discharge.** Requires a final diagnosis plus fields for the outcome: *home* (summary and
+  instructions), *transferred out* (destination and summary), *left against advice* (summary),
+  *deceased* (time and cause of death, doctors only, `403` for anyone else). The discharge time
+  cannot be before admission or in the future. Open lab orders or undispensed prescriptions linked
+  to the stay produce `warnings` in the response but never block the discharge, and nothing linked
+  is deleted or detached.
+- **Cancel.** Needs a reason. A cancelled admission is kept, shown struck through and marked
+  cancelled, with who cancelled it and why.
+- **Notes and vitals.** Append-only notes (progress, ward round, procedure, diagnosis update) and
+  structured vitals readings (temperature, pulse, blood pressure, respiratory rate, SpO2, weight),
+  allowed only while the patient is admitted (`409` otherwise). Doctors and admins record them;
+  there is no nurse role (see *Where a nurse role would plug in* below).
+- **Who sees what.** Doctor/admin: full clinical detail. Receptionist: census only (patient,
+  admission number, dates, status; no diagnoses, notes, vitals or summaries). Patient: read-only
+  view of their own admissions including discharge summary and instructions. Next of kin: status
+  and dates only, only while the assignment is active with consent given. Pharmacist and lab
+  technician: no access. Every create, view of clinical detail, update, discharge and cancel is
+  written to the access log (field *names* only, never the clinical text).
+- **History and stats.** `GET /api/patients/:id/admissions` returns a patient's history with length
+  of stay and a 30-day readmission flag. `GET /api/admissions/stats` (doctor/admin) returns
+  current admissions, discharges today (Lusaka day), completed admissions, average length of stay
+  and readmission count.
+- **Linked work.** `Prescription`, `LabOrder` and `MedicalRecord` gained an optional `admissionId`
+  (existing rows are untouched). Lab orders and prescriptions can be made from an admission; patients
+  still see lab results only after the doctor releases them.
+- **Integrations.** The care team now includes the admitting and attending doctors, so they can
+  message the patient. The care timeline has a new *Admissions* kind (admitted, discharged and
+  cancelled events). The `/api/admissions`, `/api/wards` and `/api/beds` paths are in the
+  middleware matcher.
+- **Screens.** Doctor dashboard *Admissions* section (headline numbers, search and filters, admit
+  pop-up, admission detail with notes, vitals, discharge form and cancel); patient *My Admissions*;
+  a small *Clinic ward status* card on the next-of-kin dashboard.
+- New: `Admission`, `AdmissionNote`, `VitalsReading`, `AdmissionCounter` models;
+  `src/lib/admissions.ts` (pure rules), `admission-views.ts` (who sees what),
+  `admission-access.ts`, `admission-labels.ts`, `datetime-input.ts`; `src/components/admissions/`;
+  tests `admissions-logic.test.ts` (60) and `admission-routes.test.ts` (63), plus guards in
+  `route-safety.test.ts` (every API area must be in the middleware matcher, dynamic folders
+  lowercase, admissions routes answer 401 and never delete).
+
+**Where a nurse role would plug in** (not built, by design): add `NURSE` to the `Role` enum in
+`prisma/schema.prisma` (and `ROLE_VALUES` in `src/lib/validators/index.ts`, `Role` in
+`src/types/index.ts`), add it to `ROLE_DASHBOARDS` in `src/lib/roles.ts`, add a path to `ROLE_PATHS`
+in `src/middleware.ts`, create `src/app/dashboard/nurse/page.tsx` and a sidebar entry in
+`src/app/dashboard/layout.tsx`, then allow `NURSE` in the notes and vitals routes only.
+
+### Fixed
+
+- The dispense route lived in a folder called `[Id]` but read `params.id`. Next.js names the
+  parameter after the folder, so the route received `Id` and `params.id` was `undefined`
+  (the prescription id was never found). Renamed the folder to `[id]`.
+
+### Removed
+
+- `src/app/api/debug/` (an unauthenticated debug endpoint), and the root `middleware.ts` and
+  `middleware-old.ts` (dead copies: Next.js only runs `src/middleware.ts`).
+
+### Added: patient engagement
 
 Patient engagement features, drawn from what comparable portals (Epic MyChart,
 campus health portals such as MyUCBerkeleyHealth, OpenEMR, Bahmni) offer and

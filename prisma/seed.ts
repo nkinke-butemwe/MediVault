@@ -4,6 +4,7 @@
 
 import { PrismaClient, Role, VisitStatus, LabFlag, LabOrderStatus, LabPriority } from '@prisma/client'
 import { computeFlag } from '../src/lib/lab'
+import { formatAdmissionNumber } from '../src/lib/admissions'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -581,6 +582,110 @@ console.log('✅ Created pharmacist:', pharmacist.email)
       ],
     })
     console.log('✅ Created sample appointment requests, messages and notifications')
+  }
+
+  // ─── Sample admissions (only if there are none yet) ──────────────────────
+  // Three stays so every screen has something to show:
+  //   1) Chanda Mutale: CURRENTLY admitted (with notes, vitals and a linked lab order)
+  //   2) Butemwe Nkinke: DISCHARGED home (next of kin gave consent when she was admitted)
+  //   3) Mwamba Sichone: CANCELLED (entered by mistake)
+  if ((await prisma.admission.count()) === 0) {
+    const daysAgoDate = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000)
+    const thisYear = new Date().getFullYear()
+
+    // 1) Currently admitted
+    const activeAdmission = await prisma.admission.create({
+      data: {
+        admissionNumber: formatAdmissionNumber(thisYear, 1),
+        patientId: patient3.id,
+        admittingDoctorId: doctor1.id,
+        attendingDoctorId: doctor1.id,
+        priority: 'URGENT',
+        source: 'WALK_IN',
+        presentingComplaint: 'Excessive thirst, frequent urination and dizziness for one week',
+        reason: 'Very high blood glucose needing monitoring and insulin adjustment',
+        provisionalDiagnosis: 'Newly presenting diabetes mellitus',
+        examinationFindings: 'Dehydrated, drowsy but rousable, no fever',
+        knownAllergies: 'None known',
+        admittedAt: daysAgoDate(2),
+        expectedDischargeAt: daysAgoDate(-3),
+        consentBy: 'PATIENT',
+      },
+    })
+    await prisma.admissionNote.createMany({
+      data: [
+        { admissionId: activeAdmission.id, authorId: doctor1.id, kind: 'PROGRESS', body: 'Rehydrating with IV fluids. Blood glucose being checked every 4 hours.', createdAt: daysAgoDate(2) },
+        { admissionId: activeAdmission.id, authorId: doctor1.id, kind: 'WARD_ROUND', body: 'Feeling better, drinking well. Glucose coming down. Continue insulin plan.', createdAt: daysAgoDate(1) },
+      ],
+    })
+    await prisma.vitalsReading.createMany({
+      data: [
+        { admissionId: activeAdmission.id, recordedById: doctor1.id, temperature: 36.8, pulse: 108, systolic: 100, diastolic: 62, respRate: 22, spo2: 97, weightKg: 71, recordedAt: daysAgoDate(2) },
+        { admissionId: activeAdmission.id, recordedById: doctor1.id, temperature: 36.7, pulse: 92, systolic: 112, diastolic: 70, respRate: 18, spo2: 98, recordedAt: daysAgoDate(1) },
+      ],
+    })
+    // Link this patient's seeded lab order to the stay
+    await prisma.labOrder.updateMany({
+      where: { patientId: patient3.id },
+      data: { admissionId: activeAdmission.id },
+    })
+
+    // 2) Discharged home, admitted with next of kin consent
+    const dischargedAdmission = await prisma.admission.create({
+      data: {
+        admissionNumber: formatAdmissionNumber(thisYear, 2),
+        patientId: patient1.id,
+        admittingDoctorId: doctor2.id,
+        attendingDoctorId: doctor2.id,
+        priority: 'EMERGENCY',
+        source: 'EMERGENCY',
+        presentingComplaint: 'Collapsed in the hostel with high fever and vomiting',
+        reason: 'Severe malaria needing intravenous treatment',
+        provisionalDiagnosis: 'Severe malaria',
+        admittedAt: daysAgoDate(30),
+        consentBy: 'NEXT_OF_KIN',
+        consentKinAssignmentId: 'seed-kin-assignment-1',
+        status: 'DISCHARGED',
+        dischargedAt: daysAgoDate(26),
+        dischargedById: doctor2.id,
+        dischargeDisposition: 'HOME',
+        finalDiagnosis: 'Severe malaria, fully treated',
+        dischargeSummary: 'Treated with IV artesunate then oral artemether-lumefantrine. Fever settled on day 2 and she tolerated food from day 3.',
+        dischargeInstructions: 'Rest for one week. Drink plenty of fluids. Return at once if the fever comes back.',
+        followUpDate: daysAgoDate(19),
+      },
+    })
+    await prisma.admissionNote.create({
+      data: { admissionId: dischargedAdmission.id, authorId: doctor2.id, kind: 'PROGRESS', body: 'Responding well to treatment, afebrile for 24 hours.', createdAt: daysAgoDate(28) },
+    })
+
+    // 3) Cancelled: entered by mistake
+    await prisma.admission.create({
+      data: {
+        admissionNumber: formatAdmissionNumber(thisYear, 3),
+        patientId: patient5.id,
+        admittingDoctorId: doctor1.id,
+        attendingDoctorId: doctor1.id,
+        priority: 'ROUTINE',
+        source: 'APPOINTMENT',
+        presentingComplaint: 'Routine blood pressure review',
+        reason: 'Observation of blood pressure for one night',
+        admittedAt: daysAgoDate(10),
+        consentBy: 'PATIENT',
+        status: 'CANCELLED',
+        cancelReason: 'Patient was admitted by mistake. A clinic visit was all that was needed.',
+        cancelledAt: daysAgoDate(10),
+        cancelledById: doctor1.id,
+      },
+    })
+
+    // The admission-number counter continues from 3, so the next real admission is number 4
+    await prisma.admissionCounter.upsert({
+      where: { year: thisYear },
+      update: { lastNumber: 3 },
+      create: { year: thisYear, lastNumber: 3 },
+    })
+    console.log('✅ Created sample admissions (1 current, 1 discharged, 1 cancelled)')
   }
 
   console.log('\n🎉 Seeding complete!')

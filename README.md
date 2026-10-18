@@ -24,6 +24,7 @@ MediVault is a secure, web-based patient portal that digitises student medical r
 - **Notifications**: A bell for every role — lab results released, prescription ready, appointment answered, new messages, new requests
 - **Care Timeline**: One chronological view of records, visits, prescriptions, released lab results and appointments
 - **Secure Messaging**: Private patient ↔ doctor conversations, limited to the doctors who actually treat the patient
+- **Inpatient Admissions**: Doctors admit a patient (patient or next-of-kin consent), record notes and vitals, and discharge or cancel the stay. One active admission per patient is enforced by the database; every outcome has its own required fields; receptionists see a census only; patients read their own stays and discharge papers; next of kin see status and dates while consent is on record
 - **Access Audit Logging**: Every access to patient data is logged — who, when, what action
 - **JWT Authentication**: Tokens stored in httpOnly cookies (XSS-safe)
 - **RBAC Middleware**: Every route is protected; users can only access their own dashboards. Every token's signature is verified — in the middleware and again inside every API route
@@ -165,6 +166,7 @@ medivault/
 │   │   │   ├── notifications/ # bell: list + mark read
 │   │   │   ├── messages/      # patient <-> doctor threads
 │   │   │   ├── timeline/      # merged care history
+│   │   │   ├── admissions/    # admit, detail, notes, vitals, discharge, cancel, stats
 │   │   │   ├── next-of-kin/   # assignments + consent toggle
 │   │   │   ├── access-logs/   # audit log read + CSV export
 │   │   │   └── admin/users/   # admin user management
@@ -182,6 +184,7 @@ medivault/
 │   │   ├── globals.css        # Tailwind CSS + global styles
 │   │   └── page.tsx           # Root redirect (→ dashboard or login)
 │   ├── components/lab/        # Lab order card + doctor lab panel
+│   ├── components/admissions/ # Admit pop-up, admission detail, notes, vitals, discharge, history
 │   ├── components/patient/    # Care timeline + appointment requests
 │   ├── components/messages/   # Messaging panel (patient and doctor)
 │   ├── components/receptionist/ # Appointment request queue
@@ -198,6 +201,8 @@ medivault/
 │   │   ├── notifications.ts   # Create bell notifications (never throws)
 │   │   ├── care-team.ts       # Which doctors may message which patient
 │   │   ├── timeline.ts        # Builds the merged care timeline
+│   │   ├── admissions.ts      # Admission rules: stay length, readmission, discharge checks, numbers
+│   │   ├── admission-views.ts # Which admission fields each role may see
 │   │   ├── logger.ts          # Access logging utility + pino app logger
 │   │   ├── prisma.ts          # Prisma client singleton
 │   │   ├── rate-limit.ts      # In-memory rate limiter for login

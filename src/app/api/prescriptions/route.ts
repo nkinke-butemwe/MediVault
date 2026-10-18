@@ -61,14 +61,26 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { patientId, medications, medicalRecordId, notes } = validation.data
+  const { patientId, medications, medicalRecordId, notes, admissionId } = validation.data
 
   const patient = await prisma.user.findFirst({ where: { id: patientId, role: 'PATIENT' } })
   if (!patient) return NextResponse.json({ success: false, error: 'Patient not found' }, { status: 404 })
 
+  // When prescribing from an admission, it must be this patient's CURRENT admission
+  if (admissionId) {
+    const admission = await prisma.admission.findFirst({
+      where: { id: admissionId, patientId, status: 'ADMITTED' },
+      select: { id: true },
+    })
+    if (!admission) {
+      return NextResponse.json({ success: false, error: 'Admission not found or no longer current' }, { status: 400 })
+    }
+  }
+
   const prescription = await prisma.prescription.create({
     data: {
       patientId,
+      admissionId: admissionId || null,
       doctorId: actorId,
       medicalRecordId: medicalRecordId || null,
       medications: JSON.stringify(medications),

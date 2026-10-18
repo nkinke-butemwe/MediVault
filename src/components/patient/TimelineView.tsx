@@ -1,6 +1,6 @@
 // src/components/patient/TimelineView.tsx
 // The patient's care timeline: records, visits, prescriptions, released lab
-// results and appointment requests in ONE list, newest first. The server
+// results, appointment requests and admissions in ONE list, newest first. The server
 // builds the list (src/lib/timeline.ts); this component only displays it.
 
 'use client'
@@ -16,6 +16,7 @@ import {
   PillIcon,
   FlaskIcon,
   ClockIcon,
+  HospitalIcon,
   type IconProps,
 } from '@/src/components/icons'
 
@@ -26,6 +27,7 @@ const KIND_STYLES: Record<TimelineKind, { label: string; icon: ComponentType<Ico
   PRESCRIPTION: { label: 'Prescriptions', icon: PillIcon, dot: 'bg-green-100 text-green-700' },
   LAB: { label: 'Lab results', icon: FlaskIcon, dot: 'bg-purple-100 text-purple-700' },
   APPOINTMENT: { label: 'Appointments', icon: ClockIcon, dot: 'bg-yellow-100 text-yellow-800' },
+  ADMISSION: { label: 'Admissions', icon: HospitalIcon, dot: 'bg-red-100 text-red-700' },
 }
 
 export default function TimelineView({ patientId }: { patientId?: string }) {

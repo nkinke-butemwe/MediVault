@@ -8,7 +8,7 @@
 
 import { parsePrescribedItems } from './pharmacy'
 
-export type TimelineKind = 'RECORD' | 'VISIT' | 'PRESCRIPTION' | 'LAB' | 'APPOINTMENT'
+export type TimelineKind = 'RECORD' | 'VISIT' | 'PRESCRIPTION' | 'LAB' | 'APPOINTMENT' | 'ADMISSION'
 
 export interface TimelineEvent {
   id: string
@@ -20,7 +20,7 @@ export interface TimelineEvent {
   // A short status label to show as a badge (e.g. "DISPENSED"), or null
   status: string | null
   // Which patient dashboard section has the full details, or null if none
-  section: 'records' | 'visits' | 'labs' | 'appointments' | null
+  section: 'records' | 'visits' | 'labs' | 'appointments' | 'admissions' | null
 }
 
 type DateLike = Date | string
@@ -45,6 +45,25 @@ export interface TimelineInput {
     scheduledFor: DateLike | null
     visitId: string | null
   }[]
+  // Optional so older callers (and older tests) keep working without admissions
+  admissions?: {
+    id: string
+    admissionNumber: string
+    status: string
+    reason: string
+    admittedAt: DateLike
+    dischargedAt: DateLike | null
+    dischargeDisposition: string | null
+    cancelledAt: DateLike | null
+  }[]
+}
+
+// Plain-English text for each way a stay can end
+const DISCHARGE_DISPOSITION_LABELS: Record<string, string> = {
+  HOME: 'Went home',
+  TRANSFERRED_OUT: 'Transferred to another facility',
+  LEFT_AGAINST_ADVICE: 'Left against medical advice',
+  DECEASED: 'Deceased',
 }
 
 // Turns a Date or a date string into an ISO string
@@ -125,6 +144,48 @@ export function buildTimeline(input: TimelineInput): TimelineEvent[] {
       status: appointment.status,
       section: 'appointments',
     })
+  }
+
+  // Admissions. A normal stay gives an "admitted" event, plus a "discharged" event once it ends.
+  // A cancelled admission never really happened, so it gives ONE "cancelled" event and no "admitted" event.
+  for (const admission of input.admissions ?? []) {
+    if (admission.status === 'CANCELLED') {
+      events.push({
+        id: `admission-cancelled-${admission.id}`,
+        kind: 'ADMISSION',
+        date: toIso(admission.cancelledAt ?? admission.admittedAt),
+        title: `Admission cancelled (${admission.admissionNumber})`,
+        detail: null,
+        status: 'CANCELLED',
+        section: 'admissions',
+      })
+      continue
+    }
+
+    events.push({
+      id: `admission-admitted-${admission.id}`,
+      kind: 'ADMISSION',
+      date: toIso(admission.admittedAt),
+      title: `Admitted (${admission.admissionNumber})`,
+      detail: admission.reason,
+      status: 'ADMITTED',
+      section: 'admissions',
+    })
+
+    if (admission.status === 'DISCHARGED' && admission.dischargedAt) {
+      const outcome = admission.dischargeDisposition
+        ? DISCHARGE_DISPOSITION_LABELS[admission.dischargeDisposition] ?? null
+        : null
+      events.push({
+        id: `admission-discharged-${admission.id}`,
+        kind: 'ADMISSION',
+        date: toIso(admission.dischargedAt),
+        title: `Discharged (${admission.admissionNumber})`,
+        detail: outcome,
+        status: 'DISCHARGED',
+        section: 'admissions',
+      })
+    }
   }
 
   // Newest first

@@ -1,6 +1,6 @@
 // src/app/api/timeline/route.ts
 // GET /api/timeline?patientId= — one chronological list of everything in a patient's care:
-// medical records, visits, prescriptions, released lab results and appointment requests.
+// medical records, visits, prescriptions, released lab results, appointment requests and admissions.
 //   patient: always their own timeline
 //   doctor / admin: any patient (the view is written to the access log)
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
   }
 
-  const [records, visits, prescriptions, labOrders, appointments] = await Promise.all([
+  const [records, visits, prescriptions, labOrders, appointments, admissions] = await Promise.all([
     prisma.medicalRecord.findMany({
       where: { patientId },
       include: { doctor: { select: { fullName: true } } },
@@ -45,6 +45,16 @@ export async function GET(request: NextRequest) {
       take: 100,
     }),
     prisma.appointmentRequest.findMany({ where: { patientId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    // Admissions: the timeline shows only dates, reason and outcome (no staff notes or vitals)
+    prisma.admission.findMany({
+      where: { patientId },
+      select: {
+        id: true, admissionNumber: true, status: true, reason: true, admittedAt: true,
+        dischargedAt: true, dischargeDisposition: true, cancelledAt: true,
+      },
+      orderBy: { admittedAt: 'desc' },
+      take: 100,
+    }),
   ])
 
   if (role !== 'PATIENT') {
@@ -57,6 +67,6 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  const events = buildTimeline({ records, visits, prescriptions, labOrders, appointments })
+  const events = buildTimeline({ records, visits, prescriptions, labOrders, appointments, admissions })
   return NextResponse.json({ success: true, data: events })
 }

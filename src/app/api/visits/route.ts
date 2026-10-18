@@ -36,6 +36,18 @@ export async function GET(request: NextRequest) {
       orderBy: { visitDate: 'asc' },
     })
 
+    // Listing today's visits shows every patient's name and student number,
+    // so we record it, just like fetching one patient's visits below.
+    // targetPatientId is null because no single patient is the target.
+    await logAccess({
+      accessedByUserId: actorId,
+      targetPatientId: null,
+      action: 'VIEW',
+      resourceType: 'VISIT',
+      details: { listed: visits.length },
+      ...getRequestMeta(request),
+    })
+
     return NextResponse.json({ success: true, data: visits })
   }
 

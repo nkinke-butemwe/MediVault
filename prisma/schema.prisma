@@ -67,6 +67,42 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+// ─── Inpatient admissions ───────────────────────────────────────────────────
+// ADMITTED -> DISCHARGED or CANCELLED. Nothing ever goes back to ADMITTED.
+enum AdmissionStatus {
+  ADMITTED
+  DISCHARGED
+  CANCELLED
+}
+
+enum AdmissionPriority {
+  EMERGENCY
+  URGENT
+  ROUTINE
+}
+
+enum AdmissionSource {
+  WALK_IN
+  APPOINTMENT
+  REFERRAL
+  TRANSFER_IN
+  EMERGENCY
+}
+
+enum DischargeDisposition {
+  HOME
+  TRANSFERRED_OUT
+  LEFT_AGAINST_ADVICE
+  DECEASED
+}
+
+enum AdmissionNoteKind {
+  PROGRESS
+  WARD_ROUND
+  PROCEDURE
+  DIAGNOSIS_UPDATE
+}
+
 // ─── Models ────────────────────────────────────────────────────────────────
 
 model User {
@@ -114,6 +150,14 @@ model User {
   messagesAsPatient    Message[]             @relation("MessagePatient")
   messagesAsDoctor     Message[]             @relation("MessageDoctor")
   messagesSent         Message[]             @relation("MessageSender")
+  // Admissions: as the patient, as admitting doctor, as attending doctor, and the discharge / cancel steps
+  admissionsAsPatient    Admission[]         @relation("AdmissionPatient")
+  admissionsAdmitted     Admission[]         @relation("AdmissionAdmittingDoctor")
+  admissionsAttending    Admission[]         @relation("AdmissionAttendingDoctor")
+  admissionsDischarged   Admission[]         @relation("AdmissionDischargedBy")
+  admissionsCancelled    Admission[]         @relation("AdmissionCancelledBy")
+  admissionNotesWritten  AdmissionNote[]     @relation("AdmissionNoteAuthor")
+  vitalsRecorded         VitalsReading[]     @relation("VitalsRecordedBy")
 }
 
 model PatientProfile {
@@ -142,6 +186,11 @@ model MedicalRecord {
   updatedAt     DateTime       @updatedAt
   // Prescriptions linked to this record
   prescriptions Prescription[]
+  // Set only when the record was written during an inpatient stay (null for normal clinic records)
+  admissionId   String?
+  admission     Admission?     @relation(fields: [admissionId], references: [id])
+
+  @@index([admissionId])
 }
 
 model Visit {
@@ -180,8 +229,13 @@ model Prescription {
   status          PrescriptionStatus @default(PENDING)
   dispensedAt     DateTime?
   notes           String?
+  // Set only when prescribed during an inpatient stay
+  admissionId     String?
+  admission       Admission?         @relation(fields: [admissionId], references: [id])
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+
+  @@index([admissionId])
 }
 
 model DrugInventory {
@@ -267,9 +321,12 @@ model LabOrder {
   reviewedAt    DateTime?
   reviewedById  String?
   doctorComment String?
+  // Set only when ordered from an inpatient admission
+  admissionId   String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  admission   Admission?     @relation(fields: [admissionId], references: [id])
   patient     User           @relation("LabOrderPatient", fields: [patientId], references: [id])
   orderedBy   User           @relation("LabOrderOrderedBy", fields: [orderedById], references: [id])
   collectedBy User?          @relation("LabOrderCollectedBy", fields: [collectedById], references: [id])
@@ -279,6 +336,7 @@ model LabOrder {
 
   @@index([patientId])
   @@index([status])
+  @@index([admissionId])
 }
 
 // One test inside an order, and (once the lab has run it) its result.
@@ -368,4 +426,123 @@ model Message {
   createdAt DateTime  @default(now())
 
   @@index([patientId, doctorId, createdAt])
+}
+
+// ─── Inpatient admissions ──────────────────────────────────────────────────
+
+// One inpatient stay (or short-stay observation) under a doctor.
+// A patient may have many admissions over time, but only ONE with status ADMITTED.
+// The "only one ADMITTED" rule is enforced by a partial unique index that lives in the
+// migration SQL (Prisma cannot express it): one_active_admission_per_patient.
+model Admission {
+  id              String            @id @default(cuid())
+  // Human-friendly number such as ADM-2026-000123, made inside the creating transaction
+  admissionNumber String            @unique
+  patientId       String
+  admittingDoctorId String
+  attendingDoctorId String
+  // The clinic visit this admission came from (plain id, no relation, like AppointmentRequest.visitId)
+  visitId         String?
+
+  // Reason and first assessment
+  priority            AdmissionPriority
+  source              AdmissionSource
+  referralFrom        String?
+  presentingComplaint String
+  reason              String
+  provisionalDiagnosis String?
+  admissionNotes      String?
+  examinationFindings String?
+  // Free-text snapshots taken on admission
+  knownAllergies      String?
+  existingConditions  String?
+  currentMedication   String?
+
+  // Admission and consent. Stored in UTC; shown in Africa/Lusaka.
+  admittedAt          DateTime          @default(now())
+  expectedDischargeAt DateTime?
+  // "PATIENT" or "NEXT_OF_KIN"
+  consentBy           String
+  // Required when consentBy is NEXT_OF_KIN (the assignment must be active with consent given)
+  consentKinAssignmentId String?
+
+  status          AdmissionStatus   @default(ADMITTED)
+
+  // Cancellation
+  cancelReason    String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+
+  // Discharge (all empty until the patient is discharged)
+  dischargedAt         DateTime?
+  dischargedById       String?
+  dischargeDisposition DischargeDisposition?
+  finalDiagnosis       String?
+  dischargeSummary     String?
+  dischargeInstructions String?
+  followUpDate         DateTime?
+  transferDestination  String?
+  timeOfDeath          DateTime?
+  causeOfDeath         String?
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient         User              @relation("AdmissionPatient", fields: [patientId], references: [id])
+  admittingDoctor User              @relation("AdmissionAdmittingDoctor", fields: [admittingDoctorId], references: [id])
+  attendingDoctor User              @relation("AdmissionAttendingDoctor", fields: [attendingDoctorId], references: [id])
+  dischargedBy    User?             @relation("AdmissionDischargedBy", fields: [dischargedById], references: [id])
+  cancelledBy     User?             @relation("AdmissionCancelledBy", fields: [cancelledById], references: [id])
+
+  notes           AdmissionNote[]
+  vitals          VitalsReading[]
+  prescriptions   Prescription[]
+  labOrders       LabOrder[]
+  medicalRecords  MedicalRecord[]
+
+  @@index([patientId, admittedAt])
+  @@index([status, admittedAt])
+}
+
+// A note written during the stay. Append-only: there is no edit or delete endpoint.
+model AdmissionNote {
+  id          String            @id @default(cuid())
+  admissionId String
+  authorId    String
+  kind        AdmissionNoteKind
+  body        String
+  createdAt   DateTime          @default(now())
+
+  admission   Admission         @relation(fields: [admissionId], references: [id])
+  author      User              @relation("AdmissionNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([admissionId, createdAt])
+}
+
+// One set of observations. Separate from Visit.vitals (which is free text).
+model VitalsReading {
+  id           String    @id @default(cuid())
+  admissionId  String
+  // Every measurement is optional, because staff do not always take all of them
+  temperature  Float?    // degrees Celsius
+  pulse        Int?      // beats per minute
+  systolic     Int?      // mmHg
+  diastolic    Int?      // mmHg
+  respRate     Int?      // breaths per minute
+  spo2         Int?      // oxygen saturation, percent
+  weightKg     Float?
+  recordedAt   DateTime  @default(now())
+  recordedById String
+
+  admission    Admission @relation(fields: [admissionId], references: [id])
+  recordedBy   User      @relation("VitalsRecordedBy", fields: [recordedById], references: [id])
+
+  @@index([admissionId, recordedAt])
+}
+
+// One row per calendar year. Used to hand out admission numbers without two requests ever
+// getting the same one: the row is incremented inside the same transaction that creates the admission.
+model AdmissionCounter {
+  year       Int @id
+  lastNumber Int @default(0)
 }
