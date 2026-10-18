@@ -11,7 +11,7 @@ import { NextRequest } from 'next/server'
 
 // ── A fake database: every call is a vi.fn() we can program per test ─────────
 const db = vi.hoisted(() => ({
-  user: { findFirst: vi.fn(), findMany: vi.fn() },
+  user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
   message: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   medicalRecord: { findMany: vi.fn() },
   prescription: { findMany: vi.fn() },
@@ -64,6 +64,7 @@ function makeDoctorPartOfCareTeam() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  db.user.findUnique.mockResolvedValue({ isActive: true })
   db.accessLog.create.mockResolvedValue({})
   db.notification.create.mockResolvedValue({})
   db.notification.createMany.mockResolvedValue({ count: 0 })

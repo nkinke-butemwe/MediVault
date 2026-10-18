@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server'
 
 // ── A fake database: every call is a vi.fn() we can program per test ─────────
 const db = vi.hoisted(() => ({
-  user: { findFirst: vi.fn() },
+  user: { findUnique: vi.fn(), findFirst: vi.fn() },
   admission: {
     findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(),
     count: vi.fn(), create: vi.fn(), updateMany: vi.fn(),
@@ -144,6 +144,7 @@ function primeAdmitHappyPath() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  db.user.findUnique.mockResolvedValue({ isActive: true })
   // The fake transaction simply runs the function against the same fake database
   db.$transaction.mockImplementation(async (work: (tx: typeof db) => unknown) => work(db))
   db.accessLog.create.mockResolvedValue({})
